@@ -1,0 +1,166 @@
+/* =====================================
+   🎨 ESTILOS GENERALES
+===================================== */
+
+.chat-container {
+  width: 420px;
+  height: 85vh;
+  background: #000000ee;
+  margin: 20px auto;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0px 8px 25px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  position: relative;
+  border: 3px solid #ff8552;
+}
+
+/* =====================================
+   🧡 HEADER
+===================================== */
+
+.chat-header {
+  background: #ff8552;
+  padding: 15px;
+  text-align: center;
+  color: #2b2b2b;
+  font-size: 18px;
+  font-weight: bold;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.clear-btn {
+  position: absolute;
+  right: 15px;
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: 0.2s;
+}
+
+.clear-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* =====================================
+   📩 ÁREA DE MENSAJES
+===================================== */
+
+.chat-messages {
+  flex: 1;
+  padding: 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scroll-behavior: smooth;
+}
+
+.msg-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.msg-row.user {
+  justify-content: flex-end;
+}
+
+.avatar {
+  font-size: 26px;
+  user-select: none;
+}
+
+/* =====================================
+   💬 Burbujas
+===================================== */
+
+.chat-bubble {
+  max-width: 70%;
+  padding: 12px 16px;
+  border-radius: 14px;
+  line-height: 1.4;
+  font-size: 15px;
+  animation: fadeIn 0.25s ease-in-out;
+  box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+}
+
+/* Bot */
+.chat-bubble.bot {
+  background: #e1e1e1;
+  color: #000;
+  border-bottom-left-radius: 4px;
+}
+
+/* Usuario */
+.chat-bubble.user {
+  background: #ff8552;
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+/* Animación de aparición */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* =====================================
+   ⌨️ INPUT
+===================================== */
+
+.chat-input {
+  padding: 12px;
+  display: flex;
+  background: #1e1e1e;
+  gap: 10px;
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  outline: none;
+  font-size: 15px;
+}
+
+.chat-input button {
+  background: #ff8552;
+  border: none;
+  padding: 12px 18px;
+  border-radius: 10px;
+  color: #000;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.chat-input button:hover {
+  transform: scale(1.05);
+}
+
+/* =====================================
+   📱 RESPONSIVE
+===================================== */
+
+@media (max-width: 500px) {
+  .chat-container {
+    width: 95%;
+    height: 90vh;
+  }
+}
+
