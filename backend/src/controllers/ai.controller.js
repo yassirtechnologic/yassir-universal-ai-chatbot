@@ -1,3 +1,4 @@
+import "../load-env.js";
 import { saveLead } from "../services/lead.service.js";
 import OpenAI from "openai";
 
@@ -7,10 +8,14 @@ const client = new OpenAI({
 
 export const handleMessage = async (req, res) => {
   try {
-    const { message } = req.body;
+    const { messages } = req.body;
+
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: "Messages array required" });
+    }
 
     // ======================================================
-    // 🔥 PROMPT MULTILENGUAJE OPTIMIZADO Y MEJORADO
+    // 🔥 PROMPT MULTILENGUAJE (SYSTEM)
     // ======================================================
     const systemPrompt = `
 Eres Yassir, el asistente oficial de Eventos York & Katy.
@@ -21,81 +26,68 @@ Eres Yassir, el asistente oficial de Eventos York & Katy.
 ⚠️ NO analices estilo, acentos ni calidad gramatical.
 ⚠️ NO decidas idioma basado en errores o traducciones.
 
-➡️ DETERMINA EL IDIOMA **ÚNICAMENTE** por la detección lingüística del texto más reciente del usuario.
+➡️ DETERMINA EL IDIOMA ÚNICAMENTE por el último mensaje del usuario.
+➡️ SIEMPRE responde en el mismo idioma.
 
-➡️ SIEMPRE responde en el mismo idioma que escribió el usuario, aunque esté mal escrito o sea simple.
+🎤 PRESENTACIÓN:
+Preséntate SOLO si es la primera interacción del usuario.
 
-Reglas:
-1. Si el usuario escribe en español → responde en español.
-2. Si escribe en inglés → responde en inglés.
-3. Si escribe en alemán → responde en alemán.
-4. NO mezcles idiomas nunca.
-5. Si el usuario cambia de idioma, tú cambias también.
+🎯 FUNCIÓN:
+- Planear eventos
+- Ofrecer menús, decoración, catering
+- Ser profesional, cálido y orientado a ventas
 
-🎤 PRESENTACIÓN (solo en la primera interacción del usuario):
-- Español: "¡Hola! Soy Yassir, tu asistente de eventos de Eventos York & Katy. ¿En qué puedo ayudarte hoy?"
-- Inglés: "Hello! I'm Yassir, your event assistant from Eventos York & Katy. How can I help you today?"
-- Alemán: "Hallo! Ich bin Yassir, Ihr Eventassistent von Eventos York & Katy. Wie kann ich Ihnen heute helfen?"
-
-🎯 TU FUNCIÓN:
-- Ayudar a planear bodas, cumpleaños, bautizos, comuniones, eventos privados y corporativos.
-- Ofrecer menús, decoración, catering, precios estimados y paquetes.
-- Ser cálido, profesional, útil y orientado a ventas.
-- Adaptar tus respuestas al idioma detectado.
-
-📩 SOBRE LOS LEADS:
-Si detectas nombre + teléfono + fecha + tipo de evento:
-- NO le digas al usuario que estás guardando nada.
-- Responde de forma natural.
-- Continúa la conversación normalmente.
-
-Tu objetivo final es ayudar, asesorar y guiar al cliente como un asistente real del negocio.
+📩 LEADS:
+Si detectas nombre + teléfono + fecha + evento → guarda sin avisar.
 `;
 
     // ======================================================
-    // 🔥 RESPUESTA DEL CHATBOT
+    // 🔥 MENSAJES PARA OPENAI (CON MEMORIA)
     // ======================================================
+    const openAIMessages = [
+      { role: "system", content: systemPrompt },
+      ...messages,
+    ];
+
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: message },
-      ],
+      messages: openAIMessages,
     });
 
     const reply = completion.choices[0].message.content;
 
     // ======================================================
-    // 📩 EXTRACCIÓN AUTOMÁTICA DE LEADS
+    // 📩 LEAD EXTRACTION (SOLO DEL ÚLTIMO MENSAJE)
     // ======================================================
+    const lastUserMessage = messages
+      .filter((m) => m.role === "user")
+      .at(-1)?.content || "";
+
     const nameRegex = /(my name is|mi nombre es)\s+([a-zA-ZÁÉÍÓÚáéíóúñÑ ]+)/i;
     const phoneRegex = /(\+?\d[\d\s-]{6,})/;
     const dateRegex =
       /(january|february|march|april|may|june|july|august|september|october|november|december|\d{1,2}\/\d{1,2}\/\d{2,4})/i;
-
     const eventRegex =
       /(wedding|boda|birthday|cumpleaños|communion|comunión|party|evento)/i;
 
-    const nameMatch = message.match(nameRegex);
-    const phoneMatch = message.match(phoneRegex);
-    const dateMatch = message.match(dateRegex);
-    const eventMatch = message.match(eventRegex);
+    const nameMatch = lastUserMessage.match(nameRegex);
+    const phoneMatch = lastUserMessage.match(phoneRegex);
+    const dateMatch = lastUserMessage.match(dateRegex);
+    const eventMatch = lastUserMessage.match(eventRegex);
 
     const cleanPhone = phoneMatch
       ? phoneMatch[1].replace(/[\s-]/g, "")
       : null;
 
     if (cleanPhone) {
-      const lead = {
+      await saveLead({
         name: nameMatch ? nameMatch[2].trim() : "No especificado",
         phone: cleanPhone,
         event: eventMatch ? eventMatch[0] : "No especificado",
         date: dateMatch ? dateMatch[0] : null,
-        message,
+        message: lastUserMessage,
         createdAt: new Date(),
-      };
-
-      await saveLead(lead);
+      });
     }
 
     // ======================================================
@@ -108,6 +100,7 @@ Tu objetivo final es ayudar, asesorar y guiar al cliente como un asistente real 
     res.status(500).json({ error: "Error processing message" });
   }
 };
+
 
 
 
