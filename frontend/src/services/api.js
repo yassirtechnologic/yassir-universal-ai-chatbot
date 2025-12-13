@@ -1,6 +1,6 @@
 // frontend/src/services/api.js
 
-const API_URL = "http://localhost:5000/api/ai/chat";
+const API_URL = "https://yassirbot-backend.onrender.com/api/ai/chat";
 
 export const sendMessage = async (message) => {
   try {
@@ -9,7 +9,7 @@ export const sendMessage = async (message) => {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ message }), // 👈 IMPORTANTE: debe ser { message }
+      body: JSON.stringify({ message }),
     });
 
     if (!response.ok) {
@@ -18,11 +18,13 @@ export const sendMessage = async (message) => {
     }
 
     const data = await response.json();
-    return data.reply; // 👈 el backend devuelve { reply: ... }
+    return data.reply;
   } catch (error) {
     console.error("Error enviando mensaje:", error);
     return "Error de conexión con el servidor.";
   }
 };
+
+
 
 
