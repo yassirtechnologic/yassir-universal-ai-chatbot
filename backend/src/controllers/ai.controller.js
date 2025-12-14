@@ -10,39 +10,40 @@ export const handleMessage = async (req, res) => {
   try {
     const { messages } = req.body;
 
-    if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ error: "Messages array required" });
+    // 🔒 Validación defensiva (clave para evitar crashes)
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({
+        error: "Messages array required",
+      });
     }
 
     // ======================================================
-    // 🔥 PROMPT MULTILENGUAJE (SYSTEM)
+    // 🔥 SYSTEM PROMPT
     // ======================================================
     const systemPrompt = `
 Eres Yassir, el asistente oficial de Eventos York & Katy.
 
-🧠 COMPORTAMIENTO DE IDIOMA (OBLIGATORIO):
-
-⚠️ NO intentes adivinar la nacionalidad del usuario.
-⚠️ NO analices estilo, acentos ni calidad gramatical.
-⚠️ NO decidas idioma basado en errores o traducciones.
-
-➡️ DETERMINA EL IDIOMA ÚNICAMENTE por el último mensaje del usuario.
-➡️ SIEMPRE responde en el mismo idioma.
+🧠 IDIOMA:
+- Responde SIEMPRE en el idioma del último mensaje del usuario.
+- No adivines nacionalidad.
+- No mezcles idiomas.
+- Cambia de idioma solo si el usuario cambia.
 
 🎤 PRESENTACIÓN:
-Preséntate SOLO si es la primera interacción del usuario.
+Preséntate SOLO si es la primera interacción.
 
 🎯 FUNCIÓN:
-- Planear eventos
-- Ofrecer menús, decoración, catering
-- Ser profesional, cálido y orientado a ventas
+- Planificar eventos (bodas, cumpleaños, bautizos, corporativos).
+- Ofrecer menús, decoración, catering.
+- Ser profesional, cercano y orientado a ventas.
 
 📩 LEADS:
-Si detectas nombre + teléfono + fecha + evento → guarda sin avisar.
+Si detectas nombre + teléfono + fecha + tipo de evento:
+- Guarda el lead sin avisar.
 `;
 
     // ======================================================
-    // 🔥 MENSAJES PARA OPENAI (CON MEMORIA)
+    // 🧠 MENSAJES CON MEMORIA
     // ======================================================
     const openAIMessages = [
       { role: "system", content: systemPrompt },
@@ -57,11 +58,11 @@ Si detectas nombre + teléfono + fecha + evento → guarda sin avisar.
     const reply = completion.choices[0].message.content;
 
     // ======================================================
-    // 📩 LEAD EXTRACTION (SOLO DEL ÚLTIMO MENSAJE)
+    // 📩 LEAD EXTRACTION (solo último mensaje del usuario)
     // ======================================================
-    const lastUserMessage = messages
-      .filter((m) => m.role === "user")
-      .at(-1)?.content || "";
+    const lastUserMessage = [...messages]
+      .reverse()
+      .find((m) => m.role === "user")?.content || "";
 
     const nameRegex = /(my name is|mi nombre es)\s+([a-zA-ZÁÉÍÓÚáéíóúñÑ ]+)/i;
     const phoneRegex = /(\+?\d[\d\s-]{6,})/;
@@ -97,9 +98,12 @@ Si detectas nombre + teléfono + fecha + evento → guarda sin avisar.
 
   } catch (error) {
     console.error("AI Controller Error:", error);
-    res.status(500).json({ error: "Error processing message" });
+    res.status(500).json({
+      error: "Error processing message",
+    });
   }
 };
+
 
 
 
