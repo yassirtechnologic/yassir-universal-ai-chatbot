@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { rateLimit, validateMessage } from "../utils/protection.js";
 
-// 🧠 PROMPT GLOBAL MULTILINGÜE
+// 🧠 PROMPT GLOBAL MULTILINGÜE PERFECTO
 const MASTER_PROMPT = `
 You are "Yassir", the intelligent assistant for Eventos York & Katy.
 
@@ -39,7 +39,7 @@ export const handleAIChat = async (req, res) => {
     const { message, messages, from } = req.body;
     const origin = from || "web";
 
-    // ✅ Aceptar message o messages[]
+    // 🧠 Aceptar message simple o messages[]
     let userMessage = message;
 
     if (!userMessage && Array.isArray(messages) && messages.length > 0) {
@@ -63,18 +63,19 @@ export const handleAIChat = async (req, res) => {
 
     const systemPrompt = MASTER_PROMPT + "\n" + getBasePrompt(origin);
 
-    // ✅ OPENAI RESPONSES API (FORMA CORRECTA)
-    const completion = await openai.responses.create({
+    // ✅ USAMOS CHAT COMPLETIONS (ESTABLE)
+    const completion = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-
-      input: `${systemPrompt}\n\nUser: ${userMessage}`,
-
-      max_output_tokens: origin === "web" ? 150 : 400,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage }
+      ],
       temperature: origin === "web" ? 0.45 : 0.85,
+      max_tokens: origin === "web" ? 150 : 400,
     });
 
     return res.json({
-      reply: completion.output_text,
+      reply: completion.choices[0].message.content,
     });
 
   } catch (error) {
@@ -98,6 +99,8 @@ Respond ONLY about events.
 Long, complete, professional event consulting answers.
 `;
 }
+
+
 
 
 
