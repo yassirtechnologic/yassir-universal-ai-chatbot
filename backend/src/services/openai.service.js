@@ -39,30 +39,39 @@ const openai = new OpenAI({
 // CHAT PRINCIPAL
 export const handleAIChat = async (req, res) => {
   try {
-    const { message, from } = req.body;
+    const { message, messages, from } = req.body;
     const origin = from || "web";
 
-    if (!message) {
-      return res.status(400).json({ error: "Debes enviar 'message'." });
+    // 🧠 Aceptar message simple o messages[]
+    let userMessage = message;
+
+    if (!userMessage && Array.isArray(messages) && messages.length > 0) {
+      userMessage = messages[messages.length - 1].content;
+    }
+
+    if (!userMessage) {
+      return res.status(400).json({
+        error: "Message or messages array required",
+      });
     }
 
     // Anti-spam
     const limitError = rateLimit(req, res);
     if (limitError) return limitError;
 
-    const validationError = validateMessage(message);
+    const validationError = validateMessage(userMessage);
     if (validationError)
       return res.status(400).json({ error: validationError });
 
     const systemPrompt = MASTER_PROMPT + "\n" + getBasePrompt(origin);
 
-    // 🚀 MULTILINGUAL PERFECTO (sin assistant pre-escrito)
+    // 🚀 MULTILINGUAL PERFECTO
     const completion = await openai.responses.create({
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
 
       input: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: message }
+        { role: "user", content: userMessage }
       ],
 
       max_output_tokens: origin === "web" ? 150 : 400,
