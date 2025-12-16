@@ -67,16 +67,16 @@ export const handleAIChat = async (req, res) => {
 
     // 🚀 MULTILINGUAL PERFECTO
     const completion = await openai.responses.create({
-      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
 
-      input: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage }
-      ],
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: message }
+    ],
 
-      max_output_tokens: origin === "web" ? 150 : 400,
-      temperature: origin === "web" ? 0.45 : 0.85,
-    });
+    max_output_tokens: origin === "web" ? 150 : 400,
+    temperature: origin === "web" ? 0.45 : 0.85,
+  });
 
     return res.json({ reply: completion.output_text });
 
