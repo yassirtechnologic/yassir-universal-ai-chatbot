@@ -1,21 +1,43 @@
-import "../load-env.js";
-import { saveLead } from "../services/lead.service.js";
-import OpenAI from "openai";
+// backend/src/controllers/ai.controller.js
 
+import "../load-env.js";
+import OpenAI from "openai";
+import { saveLead } from "../services/lead.service.js";
+
+/**
+ * 🔐 VALIDACIÓN GLOBAL DE API KEY
+ * (útil para ver errores claros en producción)
+ */
+if (!process.env.OPENAI_API_KEY) {
+  console.error("❌ OPENAI_API_KEY no está definida en el entorno");
+}
+
+/**
+ * 🤖 Cliente OpenAI
+ */
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export const handleMessage = async (req, res) => {
+/**
+ * 🚀 Handler principal del chatbot
+ */
+export const handleAIChat = async (req, res) => {
   try {
-    const { messages } = req.body;
-
-    // 🔒 Validación defensiva (clave para evitar crashes)
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return res.status(400).json({
-        error: "Messages array required",
+    // 🔐 Protección dura: sin API key no seguimos
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({
+        reply: "⚠️ El servicio de IA no está configurado correctamente.",
       });
     }
+
+    const { messages } = req.body;
+
+    // 🛡️ Seguridad: garantizar array de mensajes
+    const safeMessages =
+      Array.isArray(messages) && messages.length > 0
+        ? messages
+        : [{ role: "user", content: "Hola" }];
 
     // ======================================================
     // 🔥 SYSTEM PROMPT
@@ -43,26 +65,28 @@ Si detectas nombre + teléfono + fecha + tipo de evento:
 `;
 
     // ======================================================
-    // 🧠 MENSAJES CON MEMORIA
+    // 🧠 MENSAJES PARA OPENAI
     // ======================================================
     const openAIMessages = [
       { role: "system", content: systemPrompt },
-      ...messages,
+      ...safeMessages,
     ];
 
+    // ======================================================
+    // 🤖 LLAMADA A OPENAI
+    // ======================================================
     const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-3.5-turbo", // modelo seguro para pruebas
       messages: openAIMessages,
     });
 
     const reply = completion.choices[0].message.content;
 
     // ======================================================
-    // 📩 LEAD EXTRACTION (solo último mensaje del usuario)
+    // 📩 EXTRACCIÓN DE LEADS
     // ======================================================
-    const lastUserMessage = [...messages]
-      .reverse()
-      .find((m) => m.role === "user")?.content || "";
+    const lastUserMessage =
+      [...safeMessages].reverse().find((m) => m.role === "user")?.content || "";
 
     const nameRegex = /(my name is|mi nombre es)\s+([a-zA-ZÁÉÍÓÚáéíóúñÑ ]+)/i;
     const phoneRegex = /(\+?\d[\d\s-]{6,})/;
@@ -94,15 +118,17 @@ Si detectas nombre + teléfono + fecha + tipo de evento:
     // ======================================================
     // 📤 RESPUESTA FINAL
     // ======================================================
-    res.json({ reply });
+    return res.json({ reply });
 
   } catch (error) {
-    console.error("AI Controller Error:", error);
-    res.status(500).json({
-      error: "Error processing message",
+    console.error("❌ AI Controller Error:", error);
+    return res.status(500).json({
+      reply: "❌ Error interno al procesar el mensaje.",
     });
   }
 };
+
+
 
 
 

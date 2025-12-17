@@ -1,14 +1,16 @@
 // backend/src/routes/ai.routes.js
 
 import { Router } from "express";
-import { handleMessage } from "../controllers/ai.controller.js";
+import { handleAIChat } from "../controllers/ai.controller.js";
 
 const router = Router();
 
-// 🔥 Ahora /chat usa el controlador NUEVO multilenguaje
-router.post("/chat", handleMessage);
+// ✅ Ruta FINAL del chatbot
+router.post("/chat", handleAIChat);
 
 export default router;
+
+
 
 
 
