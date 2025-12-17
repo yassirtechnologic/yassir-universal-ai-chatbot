@@ -6,7 +6,6 @@ import { saveLead } from "../services/lead.service.js";
 
 /**
  * 🔐 VALIDACIÓN GLOBAL DE API KEY
- * (útil para ver errores claros en producción)
  */
 if (!process.env.OPENAI_API_KEY) {
   console.error("❌ OPENAI_API_KEY no está definida en el entorno");
@@ -24,7 +23,7 @@ const client = new OpenAI({
  */
 export const handleAIChat = async (req, res) => {
   try {
-    // 🔐 Protección dura: sin API key no seguimos
+    // 🔐 Protección dura
     if (!process.env.OPENAI_API_KEY) {
       return res.status(500).json({
         reply: "⚠️ El servicio de IA no está configurado correctamente.",
@@ -33,36 +32,46 @@ export const handleAIChat = async (req, res) => {
 
     const { messages } = req.body;
 
-    // 🛡️ Seguridad: garantizar array de mensajes
+    // 🛡️ Garantizar historial válido
     const safeMessages =
       Array.isArray(messages) && messages.length > 0
         ? messages
         : [{ role: "user", content: "Hola" }];
 
+    // 🧠 Detectar si es primera interacción
+    const isFirstMessage =
+      safeMessages.length === 1 && safeMessages[0].role === "user";
+
     // ======================================================
-    // 🔥 SYSTEM PROMPT
+    // 🔥 SYSTEM PROMPT DINÁMICO (CLAVE)
     // ======================================================
     const systemPrompt = `
-Eres Yassir, el asistente oficial de Eventos York & Katy.
+    Eres Yassir, el asistente oficial de Eventos York & Katy.
 
-🧠 IDIOMA:
-- Responde SIEMPRE en el idioma del último mensaje del usuario.
-- No adivines nacionalidad.
-- No mezcles idiomas.
-- Cambia de idioma solo si el usuario cambia.
+    IDENTIDAD:
+    - Tu nombre es Yassir.
+    - Hablas de forma cercana, profesional y orientada a ayudar.
 
-🎤 PRESENTACIÓN:
-Preséntate SOLO si es la primera interacción.
+    IDIOMA:
+    - Responde SIEMPRE en el idioma del último mensaje del usuario.
+    - No mezcles idiomas.
+    - Cambia solo si el usuario cambia.
 
-🎯 FUNCIÓN:
-- Planificar eventos (bodas, cumpleaños, bautizos, corporativos).
-- Ofrecer menús, decoración, catering.
-- Ser profesional, cercano y orientado a ventas.
+    PRESENTACIÓN:
+    ${isFirstInteraction
+      ? "- Preséntate diciendo claramente: 'Hola, soy Yassir, el asistente de Eventos York & Katy.'"
+      : "- NO te vuelvas a presentar ni repitas tu nombre."}
 
-📩 LEADS:
-Si detectas nombre + teléfono + fecha + tipo de evento:
-- Guarda el lead sin avisar.
-`;
+    FUNCIÓN:
+    - Ayudar a planificar eventos (bodas, cumpleaños, bautizos, corporativos).
+    - Ofrecer ideas de menú, decoración y catering.
+    - Guiar paso a paso al cliente.
+
+    LEADS:
+    - Si detectas nombre, teléfono, fecha o tipo de evento:
+    - Guarda el lead sin avisar al usuario.
+    `;
+
 
     // ======================================================
     // 🧠 MENSAJES PARA OPENAI
@@ -76,8 +85,9 @@ Si detectas nombre + teléfono + fecha + tipo de evento:
     // 🤖 LLAMADA A OPENAI
     // ======================================================
     const completion = await client.chat.completions.create({
-      model: "gpt-3.5-turbo", // modelo seguro para pruebas
+      model: "gpt-3.5-turbo", // estable y barato para producción
       messages: openAIMessages,
+      temperature: 0.6,
     });
 
     const reply = completion.choices[0].message.content;
