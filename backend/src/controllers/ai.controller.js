@@ -5,7 +5,7 @@ import OpenAI from "openai";
 import { saveLead } from "../services/lead.service.js";
 
 /**
- * 🔐 VALIDACIÓN GLOBAL DE API KEY
+ * 🔐 Validación global de API KEY
  */
 if (!process.env.OPENAI_API_KEY) {
   console.error("❌ OPENAI_API_KEY no está definida en el entorno");
@@ -23,7 +23,6 @@ const client = new OpenAI({
  */
 export const handleAIChat = async (req, res) => {
   try {
-    // 🔐 Protección dura
     if (!process.env.OPENAI_API_KEY) {
       return res.status(500).json({
         reply: "⚠️ El servicio de IA no está configurado correctamente.",
@@ -32,49 +31,48 @@ export const handleAIChat = async (req, res) => {
 
     const { messages } = req.body;
 
-    // 🛡️ Garantizar historial válido
-    const safeMessages =
-      Array.isArray(messages) && messages.length > 0
-        ? messages
-        : [{ role: "user", content: "Hola" }];
+    // 🛡️ Seguridad: siempre trabajar con array válido
+    const safeMessages = Array.isArray(messages) ? messages : [];
 
-    // 🧠 Detectar si es primera interacción
-    const isFirstMessage =
-      safeMessages.length === 1 && safeMessages[0].role === "user";
+    // ✅ Detectar primera interacción REAL
+    const isFirstInteraction = safeMessages.length <= 1;
 
     // ======================================================
-    // 🔥 SYSTEM PROMPT DINÁMICO (CLAVE)
+    // 🔥 SYSTEM PROMPT
     // ======================================================
     const systemPrompt = `
-    Eres Yassir, el asistente oficial de Eventos York & Katy.
+Eres Yassir, el asistente oficial de Eventos York & Katy.
 
-    IDENTIDAD:
-    - Tu nombre es Yassir.
-    - Hablas de forma cercana, profesional y orientada a ayudar.
+IDENTIDAD:
+- Tu nombre es Yassir.
+- Eres un asistente profesional de planificación de eventos.
 
-    IDIOMA:
-    - Responde SIEMPRE en el idioma del último mensaje del usuario.
-    - No mezcles idiomas.
-    - Cambia solo si el usuario cambia.
+IDIOMA:
+- Responde SIEMPRE en el idioma del último mensaje del usuario.
+- No mezcles idiomas.
+- Cambia de idioma solo si el usuario cambia.
 
-    PRESENTACIÓN:
-    ${isFirstInteraction
-      ? "- Preséntate diciendo claramente: 'Hola, soy Yassir, el asistente de Eventos York & Katy.'"
-      : "- NO te vuelvas a presentar ni repitas tu nombre."}
+PRESENTACIÓN:
+- ${
+      isFirstInteraction
+        ? "Preséntate diciendo: \"Hola, soy Yassir, el asistente de Eventos York & Katy\"."
+        : "NO te vuelvas a presentar."
+    }
 
-    FUNCIÓN:
-    - Ayudar a planificar eventos (bodas, cumpleaños, bautizos, corporativos).
-    - Ofrecer ideas de menú, decoración y catering.
-    - Guiar paso a paso al cliente.
+FUNCIÓN:
+- Ayudar a planificar eventos (bodas, cumpleaños, bautizos, corporativos).
+- Ofrecer menús, decoración y catering.
+- Guiar la conversación paso a paso.
 
-    LEADS:
-    - Si detectas nombre, teléfono, fecha o tipo de evento:
-    - Guarda el lead sin avisar al usuario.
-    `;
+ESTILO:
+- Cercano, claro y orientado a cerrar el evento.
 
+LEADS:
+- Si detectas nombre + teléfono + fecha + tipo de evento, guarda el lead sin avisar.
+`;
 
     // ======================================================
-    // 🧠 MENSAJES PARA OPENAI
+    // 🧠 Mensajes para OpenAI
     // ======================================================
     const openAIMessages = [
       { role: "system", content: systemPrompt },
@@ -82,18 +80,17 @@ export const handleAIChat = async (req, res) => {
     ];
 
     // ======================================================
-    // 🤖 LLAMADA A OPENAI
+    // 🤖 Llamada a OpenAI
     // ======================================================
     const completion = await client.chat.completions.create({
-      model: "gpt-3.5-turbo", // estable y barato para producción
+      model: "gpt-3.5-turbo",
       messages: openAIMessages,
-      temperature: 0.6,
     });
 
     const reply = completion.choices[0].message.content;
 
     // ======================================================
-    // 📩 EXTRACCIÓN DE LEADS
+    // 📩 Extracción de leads
     // ======================================================
     const lastUserMessage =
       [...safeMessages].reverse().find((m) => m.role === "user")?.content || "";
@@ -105,38 +102,32 @@ export const handleAIChat = async (req, res) => {
     const eventRegex =
       /(wedding|boda|birthday|cumpleaños|communion|comunión|party|evento)/i;
 
-    const nameMatch = lastUserMessage.match(nameRegex);
     const phoneMatch = lastUserMessage.match(phoneRegex);
-    const dateMatch = lastUserMessage.match(dateRegex);
-    const eventMatch = lastUserMessage.match(eventRegex);
 
-    const cleanPhone = phoneMatch
-      ? phoneMatch[1].replace(/[\s-]/g, "")
-      : null;
-
-    if (cleanPhone) {
+    if (phoneMatch) {
       await saveLead({
-        name: nameMatch ? nameMatch[2].trim() : "No especificado",
-        phone: cleanPhone,
-        event: eventMatch ? eventMatch[0] : "No especificado",
-        date: dateMatch ? dateMatch[0] : null,
+        name: lastUserMessage.match(nameRegex)?.[2]?.trim() || "No especificado",
+        phone: phoneMatch[1].replace(/[\s-]/g, ""),
+        event: lastUserMessage.match(eventRegex)?.[0] || "No especificado",
+        date: lastUserMessage.match(dateRegex)?.[0] || null,
         message: lastUserMessage,
         createdAt: new Date(),
       });
     }
 
     // ======================================================
-    // 📤 RESPUESTA FINAL
+    // 📤 Respuesta final
     // ======================================================
     return res.json({ reply });
 
   } catch (error) {
-    console.error("❌ AI Controller Error:", error);
+    console.error("❌ Error del controlador de IA:", error);
     return res.status(500).json({
       reply: "❌ Error interno al procesar el mensaje.",
     });
   }
 };
+
 
 
 
