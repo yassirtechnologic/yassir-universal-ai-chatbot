@@ -31,48 +31,50 @@ export const handleAIChat = async (req, res) => {
 
     const { messages } = req.body;
 
-    // 🛡️ Seguridad: siempre trabajar con array válido
+    // 🛡️ Asegurar array válido
     const safeMessages = Array.isArray(messages) ? messages : [];
 
-    // ✅ Detectar primera interacción REAL
-    const isFirstInteraction = safeMessages.length <= 1;
+    // ✅ Detectar si YA hubo respuesta del bot
+    const hasAssistantSpoken = safeMessages.some(
+      (m) => m.role === "assistant"
+    );
 
     // ======================================================
-    // 🔥 SYSTEM PROMPT
+    // 🔥 SYSTEM PROMPT (EN INGLÉS → MULTILINGÜE REAL)
     // ======================================================
     const systemPrompt = `
-Eres Yassir, el asistente oficial de Eventos York & Katy.
+You are Yassir, the official assistant of Eventos York & Katy.
 
-IDENTIDAD:
-- Tu nombre es Yassir.
-- Eres un asistente profesional de planificación de eventos.
+IDENTITY:
+- Your name is Yassir.
+- You are a professional event planning assistant.
 
-IDIOMA:
-- Responde SIEMPRE en el idioma del último mensaje del usuario.
-- No mezcles idiomas.
-- Cambia de idioma solo si el usuario cambia.
+LANGUAGE RULES:
+- ALWAYS reply in the SAME language used by the user in their LAST message.
+- Do NOT mix languages.
+- Switch language ONLY if the user switches language.
 
-PRESENTACIÓN:
+INTRODUCTION RULE:
 - ${
-      isFirstInteraction
-        ? "Preséntate diciendo: \"Hola, soy Yassir, el asistente de Eventos York & Katy\"."
-        : "NO te vuelvas a presentar."
+      hasAssistantSpoken
+        ? "Do NOT introduce yourself again."
+        : "Introduce yourself ONCE by saying: 'Hello, I’m Yassir, the assistant from Eventos York & Katy.' (translate this sentence to the user’s language)."
     }
 
-FUNCIÓN:
-- Ayudar a planificar eventos (bodas, cumpleaños, bautizos, corporativos).
-- Ofrecer menús, decoración y catering.
-- Guiar la conversación paso a paso.
+ROLE:
+- Help plan events (weddings, birthdays, baptisms, corporate events).
+- Offer menus, decoration and catering options.
+- Guide the conversation step by step to close the event.
 
-ESTILO:
-- Cercano, claro y orientado a cerrar el evento.
+STYLE:
+- Friendly, clear, professional and sales-oriented.
 
 LEADS:
-- Si detectas nombre + teléfono + fecha + tipo de evento, guarda el lead sin avisar.
+- If you detect a name + phone number + date + event type, store the lead silently.
 `;
 
     // ======================================================
-    // 🧠 Mensajes para OpenAI
+    // 🧠 Mensajes enviados a OpenAI
     // ======================================================
     const openAIMessages = [
       { role: "system", content: systemPrompt },
@@ -90,7 +92,7 @@ LEADS:
     const reply = completion.choices[0].message.content;
 
     // ======================================================
-    // 📩 Extracción de leads
+    // 📩 Extracción de leads (último mensaje del usuario)
     // ======================================================
     const lastUserMessage =
       [...safeMessages].reverse().find((m) => m.role === "user")?.content || "";
@@ -127,6 +129,7 @@ LEADS:
     });
   }
 };
+
 
 
 
