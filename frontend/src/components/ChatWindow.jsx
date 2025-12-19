@@ -18,68 +18,58 @@ const ChatWindow = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // Convertir formato FRONTEND -> BACKEND
-  const convertMessages = (extraUserMessage = null) => {
-    const history = messages.map((m) => ({
+  const handleSend = async () => {
+  if (!input.trim() || loading) return;
+
+  const userInput = input;
+
+  // ✅ Construir historial REAL para el backend
+  const historyForBackend = [
+    ...messages.map((m) => ({
       role: m.from === "user" ? "user" : "assistant",
       content: m.text,
-    }));
+    })),
+    { role: "user", content: userInput },
+  ];
 
-    // 🔥 INYECTAR el mensaje actual del usuario
-    if (extraUserMessage) {
-      history.push({
-        role: "user",
-        content: extraUserMessage,
-      });
+  // Mostrar mensaje del usuario
+  addMessage("user", userInput);
+  setInput("");
+  setLoading(true);
+
+  try {
+    const payload = { messages: historyForBackend };
+
+    console.log("🚀 Payload enviado:", payload);
+
+    const reply = await sendMessage(payload);
+
+    if (!reply || typeof reply !== "string") {
+      addMessage("bot", "⚠️ Error en la respuesta del servidor.");
+      return;
     }
 
-    return history;
-  };
+    // Crear mensaje del bot REAL
+    addMessage("bot", "");
 
-  const handleSend = async () => {
-    if (!input.trim() || loading) return;
+    // Efecto typing
+    let index = 0;
+    const interval = setInterval(() => {
+      updateLastBotMessage(reply.slice(0, index));
+      index++;
 
-    const userInput = input;
-
-    // Mostrar mensaje del usuario inmediatamente
-    addMessage("user", userInput);
-    setInput("");
-    setLoading(true);
-
-    try {
-      const payload = {
-        messages: convertMessages(userInput), // ✅ CLAVE
-      };
-
-      console.log("🚀 Payload enviado:", payload);
-
-      const reply = await sendMessage(payload);
-
-      if (!reply || typeof reply !== "string") {
-        addMessage("bot", "⚠️ Error en la respuesta del servidor.");
-        return;
+      if (index > reply.length) {
+        clearInterval(interval);
       }
+    }, 15);
 
-      // Crear mensaje del bot REAL
-      addMessage("bot", "");
-
-      // Efecto typing
-      let index = 0;
-      const interval = setInterval(() => {
-        updateLastBotMessage(reply.slice(0, index));
-        index++;
-
-        if (index > reply.length) {
-          clearInterval(interval);
-        }
-      }, 15);
-    } catch (error) {
-      console.error("❌ Error:", error);
-      updateLastBotMessage("❌ Error al conectar con el servidor.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (error) {
+    console.error("❌ Error:", error);
+    addMessage("bot", "❌ Error al conectar con el servidor.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="chat-container">
