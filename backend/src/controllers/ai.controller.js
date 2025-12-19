@@ -92,9 +92,9 @@ LEADS:
     // 🤖 Llamada a OpenAI
     // ======================================================
     const completion = await client.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: openAIMessages,
-      temperature: 0.7,
+    model: "gpt-4o-mini",
+    messages: openAIMessages,
+    temperature: 0.5,
     });
 
     const reply = completion.choices[0].message.content;
