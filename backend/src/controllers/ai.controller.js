@@ -34,50 +34,58 @@ export const handleAIChat = async (req, res) => {
     // 🛡️ Asegurar array válido
     const safeMessages = Array.isArray(messages) ? messages : [];
 
-    // 🧠 Detectar si es el primer mensaje REAL del usuario
-    const userMessagesCount = safeMessages.filter(
-      (m) => m.role === "user"
-    ).length;
+    // 🧠 Detectar si es la primera interacción real con el asistente
+    const hasAssistantSpoken = safeMessages.some(
+      (m) => m.role === "assistant"
+    );
 
-    const isFirstUserMessage = userMessagesCount === 1;
+    const isFirstInteraction = !hasAssistantSpoken;
 
     // ======================================================
-    // 🔥 SYSTEM PROMPT (PRODUCCIÓN)
+    // 🔥 SYSTEM PROMPT (ESPAÑOL – PRODUCCIÓN)
     // ======================================================
     const systemPrompt = `
-You are Yassir, the official virtual assistant of Eventos York & Katy.
+Eres Yassir, el asistente virtual oficial de Eventos York & Katy.
 
-CORE RULES (MANDATORY):
-1. Respond ALWAYS in the same language as the user's LAST message.
-2. Never mix languages.
-3. Detect the language automatically from the user's message.
-4. Maintain conversation context at all times (event type, number of guests, preferences).
-5. Never reset the conversation.
-
-INTRODUCTION RULE:
+INTRODUCCIÓN:
 - ${
-      isFirstUserMessage
-        ? "Introduce yourself ONCE in the user's language: 'I am Yassir, the assistant from Eventos York & Katy.'"
-        : "Do NOT introduce yourself again."
+      isFirstInteraction
+        ? "Preséntate SOLO UNA VEZ diciendo: 'Hola, soy Yassir, el asistente de Eventos York & Katy. Estoy aquí para ayudarte a organizar tu evento.' Usa el idioma del usuario."
+        : "NO vuelvas a presentarte."
     }
 
-BEHAVIOR:
-- Act as a professional event planner.
-- Be friendly, natural and human.
-- Avoid generic phrases like 'How can I assist you today?' after the first message.
-- Ask follow-up questions only when they help move the event forward.
+IDENTIDAD:
+- Eres un asistente profesional de organización de eventos.
+- Eres MULTILINGÜE y puedes comunicarte en español e inglés.
 
-EVENT EXPERTISE:
-- Weddings, birthdays, baptisms, corporate events.
-- Catering, menus, decoration and logistics.
+⚠️ REGLA CRÍTICA DE IDIOMA (MÁXIMA PRIORIDAD):
+- Responde SIEMPRE en el mismo idioma del ÚLTIMO mensaje del usuario.
+- No mezcles idiomas.
+- No cambies de idioma por tu cuenta.
 
-SALES GOAL:
-- Guide the conversation smoothly toward closing the event.
-- If the user asks for ideas, give concrete and realistic suggestions adapted to the event size.
+REGLAS DE CONVERSACIÓN:
+- Mantén el contexto de la conversación.
+- Recuerda el tipo de evento, número de invitados y preferencias.
+- Nunca reinicies la conversación.
+- No repitas preguntas que ya hayan sido respondidas.
+
+COMPORTAMIENTO:
+- Actúa como un organizador de eventos profesional.
+- Sé cercano, claro y humano.
+- Haz preguntas solo si ayudan a avanzar la organización del evento.
+
+EXPERIENCIA EN EVENTOS:
+- Bodas
+- Cumpleaños
+- Bautizos
+- Eventos corporativos
+- Catering, menús, decoración y logística.
+
+OBJETIVO COMERCIAL:
+- Guiar la conversación de forma natural hacia la contratación del evento.
 
 LEADS:
-- If the user provides name, phone, date and event type, continue the conversation normally.
-- Lead saving is handled silently in the backend.
+- El guardado de datos se realiza de forma silenciosa en el backend.
 `;
 
     // ======================================================
@@ -92,25 +100,25 @@ LEADS:
     // 🤖 Llamada a OpenAI
     // ======================================================
     const completion = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: openAIMessages,
-    temperature: 0.5,
+      model: "gpt-4o-mini",
+      messages: openAIMessages,
+      temperature: 0.5,
     });
 
     const reply = completion.choices[0].message.content;
 
     // ======================================================
-    // 📩 Extracción de leads (último mensaje del usuario)
+    // 📩 Extracción de leads
     // ======================================================
     const lastUserMessage =
       [...safeMessages].reverse().find((m) => m.role === "user")?.content || "";
 
-    const nameRegex = /(my name is|mi nombre es)\s+([a-zA-ZÁÉÍÓÚáéíóúñÑ ]+)/i;
+    const nameRegex = /(mi nombre es|my name is)\s+([a-zA-ZÁÉÍÓÚáéíóúñÑ ]+)/i;
     const phoneRegex = /(\+?\d[\d\s-]{6,})/;
     const dateRegex =
-      /(january|february|march|april|may|june|july|august|september|october|november|december|\d{1,2}\/\d{1,2}\/\d{2,4})/i;
+      /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre|\d{1,2}\/\d{1,2}\/\d{2,4})/i;
     const eventRegex =
-      /(wedding|boda|birthday|cumpleaños|communion|comunión|party|evento)/i;
+      /(boda|wedding|cumpleaños|birthday|bautizo|evento|party)/i;
 
     const phoneMatch = lastUserMessage.match(phoneRegex);
 
@@ -125,9 +133,6 @@ LEADS:
       });
     }
 
-    // ======================================================
-    // 📤 Respuesta final
-    // ======================================================
     return res.json({ reply });
 
   } catch (error) {
@@ -137,6 +142,7 @@ LEADS:
     });
   }
 };
+
 
 
 
