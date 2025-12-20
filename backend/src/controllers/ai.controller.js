@@ -1,5 +1,3 @@
-// backend/src/controllers/ai.controller.js
-
 import "../load-env.js";
 import OpenAI from "openai";
 import { saveLead } from "../services/lead.service.js";
@@ -34,7 +32,7 @@ export const handleAIChat = async (req, res) => {
     // 🛡️ Asegurar array válido
     const safeMessages = Array.isArray(messages) ? messages : [];
 
-    // 🧠 Detectar si es la primera interacción real con el asistente
+    // 🧠 Detectar si el asistente ya habló
     const hasAssistantSpoken = safeMessages.some(
       (m) => m.role === "assistant"
     );
@@ -42,48 +40,80 @@ export const handleAIChat = async (req, res) => {
     const isFirstInteraction = !hasAssistantSpoken;
 
     // ======================================================
+    // 🧠 Detectar último mensaje del usuario
+    // ======================================================
+    const lastUserMessage =
+      [...safeMessages].reverse().find((m) => m.role === "user")?.content || "";
+
+    // ======================================================
+    // 🧠 Detectar fase de la conversación
+    // ======================================================
+    let conversationStage = "inicio";
+
+    if (
+      /(boda|wedding|cumpleaños|birthday|bautizo|evento|party)/i.test(
+        lastUserMessage
+      )
+    ) {
+      conversationStage = "tipo_evento";
+    }
+
+    if (/\d+\s*(personas|invitados|guests)/i.test(lastUserMessage)) {
+      conversationStage = "personas";
+    }
+
+    if (
+      /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre|\d{1,2}\/\d{1,2}\/\d{2,4})/i.test(
+        lastUserMessage
+      )
+    ) {
+      conversationStage = "fecha";
+    }
+
+    // ======================================================
     // 🔥 SYSTEM PROMPT (ESPAÑOL – PRODUCCIÓN)
     // ======================================================
     const systemPrompt = `
-    Eres Yassir, el asistente virtual oficial de Eventos York & Katy.
+Eres Yassir, el asistente virtual oficial de Eventos York & Katy.
 
-    ⚠️ REGLA CRÍTICA DE IDIOMA (MÁXIMA PRIORIDAD):
-    - Detecta automáticamente el idioma del ÚLTIMO mensaje del usuario.
-    - Responde SIEMPRE en ese idioma.
-    - Si el usuario escribe en español, respondes en español.
-    - Si el usuario escribe en inglés, respondes en inglés.
-    - NO mezcles idiomas.
-    - NO cambies de idioma por tu cuenta.
-    - Ignora el idioma del prompt si es distinto al del usuario.
+⚠️ REGLA CRÍTICA DE IDIOMA (MÁXIMA PRIORIDAD):
+- Detecta automáticamente el idioma del ÚLTIMO mensaje del usuario.
+- Responde SIEMPRE en ese idioma.
+- NO mezcles idiomas.
+- NO cambies de idioma por tu cuenta.
 
-    INTRODUCCIÓN:
-    - ${
+INTRODUCCIÓN:
+- ${
       isFirstInteraction
         ? "Preséntate SOLO UNA VEZ en el idioma del usuario diciendo: 'Hola, soy Yassir, el asistente de Eventos York & Katy. Estoy aquí para ayudarte a organizar tu evento.'"
         : "NO vuelvas a presentarte."
     }
 
-    IDENTIDAD:
-    - Eres un asistente profesional de organización de eventos.
-    - Eres MULTILINGÜE y puedes comunicarte en español e inglés.
+IDENTIDAD:
+- Eres un organizador de eventos profesional.
+- Cercano, claro y humano.
+- No repites información ya dada.
 
-COMPORTAMIENTO:
-- Actúa como un organizador de eventos profesional.
-- Sé cercano, claro y humano.
-- Haz preguntas solo si ayudan a avanzar la organización del evento.
-
-EXPERIENCIA EN EVENTOS:
+EXPERIENCIA:
 - Bodas
 - Cumpleaños
 - Bautizos
 - Eventos corporativos
-- Catering, menús, decoración y logística.
+- Catering, decoración y logística.
 
-OBJETIVO COMERCIAL:
-- Guiar la conversación de forma natural hacia la contratación del evento.
+OBJETIVO:
+- Guiar al usuario paso a paso hasta la contratación del evento.
 
-LEADS:
-- El guardado de datos se realiza de forma silenciosa en el backend.
+ESTADO ACTUAL DE LA CONVERSACIÓN:
+- Fase actual: ${conversationStage}
+
+REGLAS DE FLUJO:
+- Si la fase es "inicio", pregunta por el tipo de evento.
+- Si la fase es "tipo_evento", NO te presentes y pregunta cuántas personas asistirán.
+- Si la fase es "personas", pregunta la fecha del evento.
+- Si la fase es "fecha", pregunta la ubicación.
+- NUNCA reinicies la conversación.
+- NUNCA repitas preguntas ya respondidas.
 `;
 
     // ======================================================
@@ -106,11 +136,8 @@ LEADS:
     const reply = completion.choices[0].message.content;
 
     // ======================================================
-    // 📩 Extracción de leads
+    // 📩 Extracción de leads (SIN ROMPER NADA)
     // ======================================================
-    const lastUserMessage =
-      [...safeMessages].reverse().find((m) => m.role === "user")?.content || "";
-
     const nameRegex = /(mi nombre es|my name is)\s+([a-zA-ZÁÉÍÓÚáéíóúñÑ ]+)/i;
     const phoneRegex = /(\+?\d[\d\s-]{6,})/;
     const dateRegex =
@@ -122,9 +149,13 @@ LEADS:
 
     if (phoneMatch) {
       await saveLead({
-        name: lastUserMessage.match(nameRegex)?.[2]?.trim() || "No especificado",
+        name:
+          lastUserMessage.match(nameRegex)?.[2]?.trim() ||
+          "No especificado",
         phone: phoneMatch[1].replace(/[\s-]/g, ""),
-        event: lastUserMessage.match(eventRegex)?.[0] || "No especificado",
+        event:
+          lastUserMessage.match(eventRegex)?.[0] ||
+          "No especificado",
         date: lastUserMessage.match(dateRegex)?.[0] || null,
         message: lastUserMessage,
         createdAt: new Date(),
@@ -140,6 +171,7 @@ LEADS:
     });
   }
 };
+
 
 
 
