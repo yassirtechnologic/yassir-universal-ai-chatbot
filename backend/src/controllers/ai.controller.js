@@ -32,29 +32,18 @@ export const handleAIChat = async (req, res) => {
     // 🛡️ Asegurar array válido
     const safeMessages = Array.isArray(messages) ? messages : [];
 
-    // 🧠 Detectar si el asistente ya habló
-    const hasAssistantSpoken = safeMessages.some(
-      (m) => m.role === "assistant"
-    );
-
-    const isFirstInteraction = !hasAssistantSpoken;
-
     // ======================================================
-    // 🧠 Detectar último mensaje del usuario
+    // 🧠 Último mensaje del usuario
     // ======================================================
     const lastUserMessage =
       [...safeMessages].reverse().find((m) => m.role === "user")?.content || "";
 
     // ======================================================
-    // 🧠 Detectar fase de la conversación
+    // 🧠 Detectar fase de la conversación (FUENTE DE VERDAD)
     // ======================================================
     let conversationStage = "inicio";
 
-    if (
-      /(boda|wedding|cumpleaños|birthday|bautizo|evento|party)/i.test(
-        lastUserMessage
-      )
-    ) {
+    if (/(boda|wedding|cumpleaños|birthday|bautizo|evento|party)/i.test(lastUserMessage)) {
       conversationStage = "tipo_evento";
     }
 
@@ -70,28 +59,52 @@ export const handleAIChat = async (req, res) => {
       conversationStage = "fecha";
     }
 
+    if (/\b(\d{1,2}:\d{2}|\d{1,2}\s*(am|pm))\b/i.test(lastUserMessage)) {
+      conversationStage = "hora";
+    }
+
     // ======================================================
-    // 🔥 SYSTEM PROMPT (ESPAÑOL – PRODUCCIÓN)
+    // ⏰ Fecha y hora actual (para contexto real)
+    // ======================================================
+    const now = new Date();
+    const fechaActual = now.toLocaleDateString("es-ES", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    const horaActual = now.toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    // ======================================================
+    // 🔥 SYSTEM PROMPT (PRODUCCIÓN – REGLAS ABSOLUTAS)
     // ======================================================
     const systemPrompt = `
 Eres Yassir, el asistente virtual oficial de Eventos York & Katy.
 
 ⚠️ REGLA CRÍTICA DE IDIOMA (MÁXIMA PRIORIDAD):
-- Detecta automáticamente el idioma del ÚLTIMO mensaje del usuario.
+- Detecta el idioma del ÚLTIMO mensaje del usuario.
 - Responde SIEMPRE en ese idioma.
 - NO mezcles idiomas.
 - NO cambies de idioma por tu cuenta.
 
-INTRODUCCIÓN:
-- ${
-      isFirstInteraction
-        ? "Preséntate SOLO UNA VEZ en el idioma del usuario diciendo: 'Hola, soy Yassir, el asistente de Eventos York & Katy. Estoy aquí para ayudarte a organizar tu evento.'"
-        : "NO vuelvas a presentarte."
-    }
+FECHA Y HORA ACTUAL:
+- Hoy es ${fechaActual}.
+- Hora actual: ${horaActual}.
+
+INTRODUCCIÓN (REGLA ABSOLUTA):
+- SOLO puedes presentarte si la fase actual es EXACTAMENTE "inicio".
+- Si la fase NO es "inicio", está TERMINANTEMENTE PROHIBIDO:
+  - Volver a presentarte
+  - Repetir el saludo
+  - Decir "Hola, soy Yassir"
+  - Preguntar otra vez el tipo de evento
 
 IDENTIDAD:
-- Eres un organizador de eventos profesional.
-- Cercano, claro y humano.
+- Eres un organizador de eventos profesional y humano.
+- Cercano, claro y directo.
 - No repites información ya dada.
 
 EXPERIENCIA:
@@ -101,19 +114,24 @@ EXPERIENCIA:
 - Eventos corporativos
 - Catering, decoración y logística.
 
-OBJETIVO:
-- Guiar al usuario paso a paso hasta la contratación del evento.
-
 ESTADO ACTUAL DE LA CONVERSACIÓN:
 - Fase actual: ${conversationStage}
 
-REGLAS DE FLUJO:
-- Si la fase es "inicio", pregunta por el tipo de evento.
-- Si la fase es "tipo_evento", NO te presentes y pregunta cuántas personas asistirán.
-- Si la fase es "personas", pregunta la fecha del evento.
-- Si la fase es "fecha", pregunta la ubicación.
+FLUJO OBLIGATORIO:
+- inicio → pregunta tipo de evento (y preséntate SOLO aquí).
+- tipo_evento → pregunta cuántas personas asistirán.
+- personas → pregunta la fecha del evento.
+- fecha → pregunta la hora aproximada.
+- hora → propone cierre (llamada, WhatsApp o cita).
+- NUNCA retrocedas.
 - NUNCA reinicies la conversación.
 - NUNCA repitas preguntas ya respondidas.
+
+OBJETIVO COMERCIAL:
+- Guiar de forma natural hasta cerrar una cita o contacto directo.
+- Propón cierre con frases como:
+  - "¿Te parece si lo vemos por WhatsApp?"
+  - "Puedo agendar una llamada contigo hoy o mañana"
 `;
 
     // ======================================================
@@ -130,13 +148,13 @@ REGLAS DE FLUJO:
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: openAIMessages,
-      temperature: 0.5,
+      temperature: 0.4,
     });
 
     const reply = completion.choices[0].message.content;
 
     // ======================================================
-    // 📩 Extracción de leads (SIN ROMPER NADA)
+    // 📩 Extracción de leads (silenciosa)
     // ======================================================
     const nameRegex = /(mi nombre es|my name is)\s+([a-zA-ZÁÉÍÓÚáéíóúñÑ ]+)/i;
     const phoneRegex = /(\+?\d[\d\s-]{6,})/;
@@ -149,13 +167,9 @@ REGLAS DE FLUJO:
 
     if (phoneMatch) {
       await saveLead({
-        name:
-          lastUserMessage.match(nameRegex)?.[2]?.trim() ||
-          "No especificado",
+        name: lastUserMessage.match(nameRegex)?.[2]?.trim() || "No especificado",
         phone: phoneMatch[1].replace(/[\s-]/g, ""),
-        event:
-          lastUserMessage.match(eventRegex)?.[0] ||
-          "No especificado",
+        event: lastUserMessage.match(eventRegex)?.[0] || "No especificado",
         date: lastUserMessage.match(dateRegex)?.[0] || null,
         message: lastUserMessage,
         createdAt: new Date(),
