@@ -1,34 +1,52 @@
 // frontend/src/services/api.js
 
-const API_URL = "https://yassirbot-backend.onrender.com/api/ai/chat";
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "https://yassirbot-backend.onrender.com/api/ai/chat";
 
-export const sendMessage = async (messages) => {
+export const sendMessage = async (payload) => {
   try {
     const response = await fetch(API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        messages: messages.map((m) => ({
-          role: m.from === "bot" ? "assistant" : "user",
-          content: m.text,
-        })),
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
-      console.error("Error en respuesta del servidor:", response.status);
-      return "Hubo un error al procesar tu mensaje.";
+      throw new Error(`Error del servidor: ${response.status}`);
     }
 
     const data = await response.json();
-    return data.reply;
+
+    // ✅ VALIDACIÓN CORRECTA
+    if (!data || !data.reply) {
+      throw new Error("Formato incorrecto del backend");
+    }
+
+    // 🔥 DEVOLVEMOS TODO, NO SOLO EL TEXTO
+    return {
+      reply: data.reply,
+      language: data.language || payload.language || "es",
+    };
+
   } catch (error) {
-    console.error("Error enviando mensaje:", error);
-    return "Error de conexión con el servidor.";
+    console.error("❌ Error de conexión:", error);
+
+    return {
+      reply: "🤖 I'm having a small technical issue. Please try again in a few seconds.",
+      language: payload.language || "es",
+    };
   }
 };
+
+
+
+
+
+
+
 
 
 

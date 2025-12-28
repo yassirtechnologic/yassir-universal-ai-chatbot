@@ -6,70 +6,101 @@ import { sendMessage } from "../services/api";
 import "../styles/chat.css";
 
 const ChatWindow = () => {
-  const { messages, addMessage, updateLastBotMessage, clearChat } =
-    useContext(ChatContext);
+  const {
+    messages,
+    language,
+    addMessage,
+    updateLastBotMessage,
+    clearChat,
+  } = useContext(ChatContext);
 
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // Scroll automático
+  // ======================================================
+  // 📜 Scroll automático
+  // ======================================================
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  // ======================================================
+  // 🚀 Enviar mensaje
+  // ======================================================
   const handleSend = async () => {
-  if (!input.trim() || loading) return;
+    if (!input.trim() || loading) return;
 
-  const userInput = input;
+    const userInput = input;
 
-  // ✅ Construir historial REAL para el backend
-  const historyForBackend = [
-    ...messages.map((m) => ({
-      role: m.from === "user" ? "user" : "assistant",
-      content: m.text,
-    })),
-    { role: "user", content: userInput },
-  ];
+    // Mostrar mensaje del usuario
+    addMessage("user", userInput);
+    setInput("");
+    setLoading(true);
 
-  // Mostrar mensaje del usuario
-  addMessage("user", userInput);
-  setInput("");
-  setLoading(true);
+    // ======================================================
+    // 🧠 Construir historial REAL para el backend
+    // ======================================================
+    const historyForBackend = [
+      ...messages.map((m) => ({
+        role: m.from === "user" ? "user" : "assistant",
+        content: m.text,
+      })),
+      { role: "user", content: userInput },
+    ];
 
-  try {
-    const payload = { messages: historyForBackend };
+    try {
+      // ✅ Payload COMPLETO (mensaje + idioma)
+      const payload = {
+        messages: historyForBackend,
+        language, // 🔥 CLAVE DEL MULTIIDIOMA
+      };
 
-    console.log("🚀 Payload enviado:", payload);
+      console.log("🚀 Payload enviado:", payload);
 
-    const reply = await sendMessage(payload);
+      const response = await sendMessage(payload);
 
-    if (!reply || typeof reply !== "string") {
-      addMessage("bot", "⚠️ Error en la respuesta del servidor.");
-      return;
-    }
-
-    // Crear mensaje del bot REAL
-    addMessage("bot", "");
-
-    // Efecto typing
-    let index = 0;
-    const interval = setInterval(() => {
-      updateLastBotMessage(reply.slice(0, index));
-      index++;
-
-      if (index > reply.length) {
-        clearInterval(interval);
+      if (!response || !response.reply) {
+        addMessage(
+          "bot",
+          language === "en"
+            ? "⚠️ Server response error."
+            : "⚠️ Error en la respuesta del servidor."
+        );
+        return;
       }
-    }, 15);
 
-  } catch (error) {
-    console.error("❌ Error:", error);
-    addMessage("bot", "❌ Error al conectar con el servidor.");
-  } finally {
-    setLoading(false);
-  }
-};
+      const replyText = response.reply;
+
+      // Crear mensaje vacío del bot (para typing)
+      addMessage("bot", "", true);
+
+      // ======================================================
+      // ✍️ Typing effect
+      // ======================================================
+      let index = 0;
+      const interval = setInterval(() => {
+        updateLastBotMessage(replyText.slice(0, index));
+        index++;
+
+        if (index > replyText.length) {
+          clearInterval(interval);
+        }
+      }, 15);
+
+    } catch (error) {
+      console.error("❌ Error:", error);
+
+      addMessage(
+        "bot",
+        language === "en"
+          ? "❌ Connection error. Please try again."
+          : "❌ Error al conectar con el servidor."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="chat-container">
@@ -100,11 +131,21 @@ const ChatWindow = () => {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Escribe tu mensaje..."
+          placeholder={
+            language === "en"
+              ? "Type your message..."
+              : "Escribe tu mensaje..."
+          }
           disabled={loading}
         />
         <button onClick={handleSend} disabled={loading}>
-          {loading ? "Enviando..." : "Enviar"}
+          {loading
+            ? language === "en"
+              ? "Sending..."
+              : "Enviando..."
+            : language === "en"
+            ? "Send"
+            : "Enviar"}
         </button>
       </div>
     </div>
@@ -112,6 +153,7 @@ const ChatWindow = () => {
 };
 
 export default ChatWindow;
+
 
 
 
