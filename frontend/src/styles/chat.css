@@ -5,15 +5,34 @@
 .chat-container {
   width: 420px;
   height: 85vh;
-  background: #000000ee;
   margin: 20px auto;
-  border-radius: 18px;
+
+  /* 🎨 Fondo distintivo y elegante */
+  background: linear-gradient(
+    145deg,
+    #fff7f2 0%,
+    #ffe1cf 45%,
+    #ffffff 100%
+  );
+
+  border-radius: 22px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0px 8px 25px rgba(0, 0, 0, 0.4);
   overflow: hidden;
   position: relative;
-  border: 3px solid #ff8552;
+
+  border: 2px solid #ff8552;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
+}
+
+.chat-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top right, rgba(255,133,82,0.18), transparent 55%),
+    radial-gradient(circle at bottom left, rgba(255,200,170,0.25), transparent 60%);
+  pointer-events: none;
 }
 
 /* =====================================
@@ -21,12 +40,12 @@
 ===================================== */
 
 .chat-header {
-  background: #ff8552;
+  background: linear-gradient(135deg, #ff9a5c, #ff7a3d);
   padding: 15px;
   text-align: center;
-  color: #2b2b2b;
+  color: #ffffff;
   font-size: 18px;
-  font-weight: bold;
+  font-weight: 600;
   position: relative;
   display: flex;
   justify-content: center;
@@ -38,10 +57,11 @@
   right: 15px;
   background: transparent;
   border: none;
-  font-size: 20px;
+  font-size: 18px;
   cursor: pointer;
-  opacity: 0.8;
-  transition: 0.2s;
+  opacity: 0.85;
+  transition: 0.2s ease;
+  color: #fff;
 }
 
 .clear-btn:hover {
@@ -63,6 +83,10 @@
   scroll-behavior: smooth;
 }
 
+/* =====================================
+   🧑 FILA DE MENSAJE
+===================================== */
+
 .msg-row {
   display: flex;
   align-items: flex-start;
@@ -74,39 +98,42 @@
 }
 
 .avatar {
-  font-size: 26px;
+  font-size: 24px;
   user-select: none;
 }
 
 /* =====================================
-   💬 Burbujas
+   💬 BURBUJAS
 ===================================== */
 
 .chat-bubble {
-  max-width: 70%;
+  max-width: 72%;
   padding: 12px 16px;
   border-radius: 14px;
-  line-height: 1.4;
+  line-height: 1.45;
   font-size: 15px;
   animation: fadeIn 0.25s ease-in-out;
-  box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.12);
 }
 
-/* Bot */
+/* 🤖 Bot */
 .chat-bubble.bot {
-  background: #e1e1e1;
-  color: #000;
+  background: #ffffff;
+  color: #333;
   border-bottom-left-radius: 4px;
 }
 
-/* Usuario */
+/* 🧑 Usuario */
 .chat-bubble.user {
   background: #ff8552;
   color: #fff;
   border-bottom-right-radius: 4px;
 }
 
-/* Animación de aparición */
+/* =====================================
+   ✨ ANIMACIÓN
+===================================== */
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -125,17 +152,22 @@
 .chat-input {
   padding: 12px;
   display: flex;
-  background: #1e1e1e;
+  background: #ffffff;
   gap: 10px;
+  border-top: 1px solid #e0e0e0;
 }
 
 .chat-input input {
   flex: 1;
   padding: 12px;
   border-radius: 10px;
-  border: none;
+  border: 1px solid #ccc;
   outline: none;
   font-size: 15px;
+}
+
+.chat-input input:focus {
+  border-color: #ff8552;
 }
 
 .chat-input button {
@@ -143,14 +175,20 @@
   border: none;
   padding: 12px 18px;
   border-radius: 10px;
-  color: #000;
-  font-weight: bold;
+  color: #fff;
+  font-weight: 600;
   cursor: pointer;
-  transition: 0.2s;
+  transition: 0.2s ease;
 }
 
 .chat-input button:hover {
+  background: #ff7433;
   transform: scale(1.05);
+}
+
+.chat-input button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* =====================================
@@ -163,4 +201,5 @@
     height: 90vh;
   }
 }
+
 

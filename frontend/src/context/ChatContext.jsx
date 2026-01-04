@@ -5,28 +5,27 @@ import React, { createContext, useState, useEffect } from "react";
 export const ChatContext = createContext();
 
 // ======================================================
-// 🧹 Limpia caracteres problemáticos
+// 🧹 Limpieza segura de texto
 // ======================================================
-const cleanText = (text) => {
-  if (!text) return "";
-  return text.replace(/[\uD800-\uDFFF]./g, "");
-};
+const cleanText = (text = "") =>
+  text.replace(/[\uD800-\uDFFF]/g, "");
 
 // ======================================================
-// 🌍 Detección básica de idioma (frontend)
+// 🌍 Detección de idioma (SOLO usuario)
 // ======================================================
-const detectLanguage = (text = "") => {
+const detectUserLanguage = (text = "") => {
   const t = text.toLowerCase();
 
   if (
-    t.includes("hello") ||
-    t.includes("hi") ||
-    t.includes("please") ||
-    t.includes("event") ||
-    t.includes("price") ||
-    t.includes("wedding")
+    /\b(hello|hi|please|event|price|wedding|people|date|time)\b/.test(t)
   ) {
     return "en";
+  }
+
+  if (
+    /\b(hallo|bitte|hochzeit|veranstaltung|personen|datum|uhr)\b/.test(t)
+  ) {
+    return "de";
   }
 
   return "es";
@@ -37,39 +36,36 @@ export const ChatProvider = ({ children }) => {
   const [language, setLanguage] = useState("es");
 
   // ======================================================
-  // 🔥 Cargar historial SOLO si existe y es válido
+  // 🔥 Cargar historial si existe
   // ======================================================
   useEffect(() => {
     const saved = localStorage.getItem("yassir_chat_history");
 
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
+    if (!saved) return;
 
-        if (Array.isArray(parsed)) {
-          setMessages(parsed);
+    try {
+      const parsed = JSON.parse(saved);
 
-          // 🔄 Recuperar idioma del último mensaje
-          const lastMessage = parsed[parsed.length - 1];
-          if (lastMessage?.language) {
-            setLanguage(lastMessage.language);
-          }
-        } else {
-          setMessages([]);
+      if (Array.isArray(parsed)) {
+        setMessages(parsed);
+
+        const lastUserMsg = [...parsed]
+          .reverse()
+          .find((m) => m.from === "user");
+
+        if (lastUserMsg?.language) {
+          setLanguage(lastUserMsg.language);
         }
-      } catch (error) {
-        console.warn("⚠️ Historial corrupto, limpiando...");
-        localStorage.removeItem("yassir_chat_history");
-        setMessages([]);
-        setLanguage("es");
       }
-    } else {
+    } catch {
+      localStorage.removeItem("yassir_chat_history");
       setMessages([]);
+      setLanguage("es");
     }
   }, []);
 
   // ======================================================
-  // 💾 Guardar historial (solo si hay mensajes)
+  // 💾 Guardar historial
   // ======================================================
   useEffect(() => {
     if (messages.length > 0) {
@@ -81,40 +77,39 @@ export const ChatProvider = ({ children }) => {
   }, [messages]);
 
   // ======================================================
-  // ➕ Agregar mensaje (usuario o bot)
+  // ➕ Agregar mensaje
   // ======================================================
   const addMessage = (from, text, typing = false) => {
-    const detectedLang =
-      from === "user" ? detectLanguage(text) : language;
+    const cleaned = cleanText(text);
+
+    let msgLanguage = language;
 
     if (from === "user") {
-      setLanguage(detectedLang);
+      msgLanguage = detectUserLanguage(cleaned);
+      setLanguage(msgLanguage);
     }
 
     setMessages((prev) => [
       ...prev,
       {
         from,
-        text: cleanText(text),
+        text: cleaned,
         typing,
-        language: detectedLang,
+        language: msgLanguage,
       },
     ]);
   };
 
   // ======================================================
-  // ✏️ Actualizar último mensaje del bot (typing effect)
+  // ✏️ Typing effect (bot)
   // ======================================================
   const updateLastBotMessage = (newText) => {
     setMessages((prev) => {
       const updated = [...prev];
-      const lastIndex = updated.length - 1;
+      const last = updated.length - 1;
 
-      if (
-        lastIndex >= 0 &&
-        updated[lastIndex].from === "bot"
-      ) {
-        updated[lastIndex].text = cleanText(newText);
+      if (updated[last]?.from === "bot") {
+        updated[last].text = cleanText(newText);
       }
 
       return updated;
@@ -122,12 +117,12 @@ export const ChatProvider = ({ children }) => {
   };
 
   // ======================================================
-  // 🗑️ Limpiar conversación COMPLETA
+  // 🗑️ Reset total
   // ======================================================
   const clearChat = () => {
     localStorage.removeItem("yassir_chat_history");
     setMessages([]);
-    setLanguage("es"); // 🔄 Reset idioma
+    setLanguage("es");
   };
 
   return (
@@ -144,6 +139,7 @@ export const ChatProvider = ({ children }) => {
     </ChatContext.Provider>
   );
 };
+
 
 
 

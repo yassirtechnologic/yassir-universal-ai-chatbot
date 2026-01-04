@@ -5,10 +5,15 @@ import { handleAIChat } from "../controllers/ai.controller.js";
 
 const router = Router();
 
-// ✅ Ruta FINAL del chatbot
+/**
+ * 🤖 Chatbot AI endpoint
+ * POST /api/ai/chat
+ * Body: { message | messages }
+ */
 router.post("/chat", handleAIChat);
 
 export default router;
+
 
 
 

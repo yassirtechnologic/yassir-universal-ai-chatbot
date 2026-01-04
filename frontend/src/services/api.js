@@ -15,31 +15,30 @@ export const sendMessage = async (payload) => {
     });
 
     if (!response.ok) {
-      throw new Error(`Error del servidor: ${response.status}`);
+      throw new Error(`Server error: ${response.status}`);
     }
 
     const data = await response.json();
 
-    // ✅ VALIDACIÓN CORRECTA
-    if (!data || !data.reply) {
-      throw new Error("Formato incorrecto del backend");
+    if (!data?.reply) {
+      throw new Error("Invalid backend response");
     }
 
-    // 🔥 DEVOLVEMOS TODO, NO SOLO EL TEXTO
+    // 🔥 El backend SOLO devuelve texto
     return {
       reply: data.reply,
-      language: data.language || payload.language || "es",
     };
 
   } catch (error) {
-    console.error("❌ Error de conexión:", error);
+    console.error("❌ API error:", error);
 
     return {
-      reply: "🤖 I'm having a small technical issue. Please try again in a few seconds.",
-      language: payload.language || "es",
+      reply:
+        "🤖 I'm having a small technical issue. Please try again in a few seconds.",
     };
   }
 };
+
 
 
 

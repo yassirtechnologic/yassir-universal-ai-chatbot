@@ -2,189 +2,165 @@ import "../load-env.js";
 import OpenAI from "openai";
 import { saveLead } from "../services/lead.service.js";
 
-/**
- * 🔐 Validación global de API KEY
- */
-if (!process.env.OPENAI_API_KEY) {
-  console.error("❌ OPENAI_API_KEY no está definida en el entorno");
-}
-
-/**
- * 🤖 Cliente OpenAI
- */
+/* ======================================================
+   🔐 OpenAI Client
+====================================================== */
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-/**
- * 🚀 Handler principal del chatbot
- */
+/* ======================================================
+   🧠 SYSTEM PROMPTS POR IDIOMA
+====================================================== */
+const SYSTEM_PROMPTS = {
+  es: `
+Eres Yassir, el asistente virtual oficial de Eventos York & Katy.
+
+REGLAS
+- Responde SIEMPRE en español.
+- No uses otros idiomas.
+- No te presentes (la presentación la gestiona el sistema).
+
+ESTILO
+- Cercano, natural y profesional.
+- Una sola pregunta a la vez.
+
+FLUJO
+inicio → tipo de evento
+tipo_evento → personas
+personas → fecha
+fecha → hora
+hora → contacto
+
+OBJETIVO
+- Guiar al cliente hasta un contacto real.
+`,
+  en: `
+You are Yassir, the official virtual assistant of Eventos York & Katy.
+
+RULES
+- ALWAYS reply in English.
+- Do not introduce yourself (system handles that).
+
+STYLE
+- Friendly and professional.
+- One question at a time.
+
+FLOW
+start → event type
+event → people
+people → date
+date → time
+time → contact
+
+GOAL
+- Close a real lead.
+`,
+  de: `
+Du bist Yassir, der virtuelle Assistent von Eventos York & Katy.
+
+REGELN
+- Antworte IMMER auf Deutsch.
+- Stelle dich nicht vor (System übernimmt das).
+
+STIL
+- Freundlich und professionell.
+- Eine Frage nach der anderen.
+
+ABLAUF
+Start → Eventtyp
+Event → Personen
+Personen → Datum
+Datum → Uhrzeit
+Uhrzeit → Kontakt
+
+ZIEL
+- Einen echten Kontakt herstellen.
+`,
+};
+
+/* ======================================================
+   🚀 HANDLER PRINCIPAL
+====================================================== */
 export const handleAIChat = async (req, res) => {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(500).json({
-        reply: "⚠️ El servicio de IA no está configurado correctamente.",
+    const { messages, language } = req.body;
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({
+        reply: "⚠️ No message received.",
       });
     }
 
-    const { messages } = req.body;
-
-    // 🛡️ Asegurar array válido
-    const safeMessages = Array.isArray(messages) ? messages : [];
-
-    // ======================================================
-    // 🧠 Último mensaje del usuario
-    // ======================================================
-    const lastUserMessage =
-      [...safeMessages].reverse().find((m) => m.role === "user")?.content || "";
-
-    // ======================================================
-    // 🧠 Detectar fase de la conversación (FUENTE DE VERDAD)
-    // ======================================================
-    let conversationStage = "inicio";
-
-    if (/(boda|wedding|cumpleaños|birthday|bautizo|evento|party)/i.test(lastUserMessage)) {
-      conversationStage = "tipo_evento";
+    if (!language || !SYSTEM_PROMPTS[language]) {
+      return res.status(400).json({
+        reply: "⚠️ Language not provided.",
+      });
     }
 
-    if (/\d+\s*(personas|invitados|guests)/i.test(lastUserMessage)) {
-      conversationStage = "personas";
+    /* ---------------- ¿Ya se presentó? ---------------- */
+    const hasIntroduction = messages.some(
+      m =>
+        m.role === "assistant" &&
+        m.meta === "intro"
+    );
+
+    /* ---------------- Presentación FORZADA ---------------- */
+    let intro = "";
+    if (!hasIntroduction) {
+      if (language === "es")
+        intro = "Hola, soy Yassir, el asistente virtual de Eventos York & Katy. ";
+      if (language === "en")
+        intro = "Hi, I'm Yassir, the virtual assistant for Eventos York & Katy. ";
+      if (language === "de")
+        intro = "Hallo, ich bin Yassir, der virtuelle Assistent von Eventos York & Katy. ";
     }
 
-    if (
-      /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre|\d{1,2}\/\d{1,2}\/\d{2,4})/i.test(
-        lastUserMessage
-      )
-    ) {
-      conversationStage = "fecha";
-    }
-
-    if (/\b(\d{1,2}:\d{2}|\d{1,2}\s*(am|pm))\b/i.test(lastUserMessage)) {
-      conversationStage = "hora";
-    }
-
-    // ======================================================
-    // ⏰ Fecha y hora actual (para contexto real)
-    // ======================================================
-    const now = new Date();
-    const fechaActual = now.toLocaleDateString("es-ES", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-    const horaActual = now.toLocaleTimeString("es-ES", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    // ======================================================
-    // 🔥 SYSTEM PROMPT (PRODUCCIÓN – REGLAS ABSOLUTAS)
-    // ======================================================
-    const systemPrompt = `
-Eres Yassir, el asistente virtual oficial de Eventos York & Katy.
-
-⚠️ REGLA CRÍTICA DE IDIOMA (MÁXIMA PRIORIDAD):
-- Detecta el idioma del ÚLTIMO mensaje del usuario.
-- Responde SIEMPRE en ese idioma.
-- NO mezcles idiomas.
-- NO cambies de idioma por tu cuenta.
-
-FECHA Y HORA ACTUAL:
-- Hoy es ${fechaActual}.
-- Hora actual: ${horaActual}.
-
-INTRODUCCIÓN (REGLA ABSOLUTA):
-- SOLO puedes presentarte si la fase actual es EXACTAMENTE "inicio".
-- Si la fase NO es "inicio", está TERMINANTEMENTE PROHIBIDO:
-  - Volver a presentarte
-  - Repetir el saludo
-  - Decir "Hola, soy Yassir"
-  - Preguntar otra vez el tipo de evento
-
-IDENTIDAD:
-- Eres un organizador de eventos profesional y humano.
-- Cercano, claro y directo.
-- No repites información ya dada.
-
-EXPERIENCIA:
-- Bodas
-- Cumpleaños
-- Bautizos
-- Eventos corporativos
-- Catering, decoración y logística.
-
-ESTADO ACTUAL DE LA CONVERSACIÓN:
-- Fase actual: ${conversationStage}
-
-FLUJO OBLIGATORIO:
-- inicio → pregunta tipo de evento (y preséntate SOLO aquí).
-- tipo_evento → pregunta cuántas personas asistirán.
-- personas → pregunta la fecha del evento.
-- fecha → pregunta la hora aproximada.
-- hora → propone cierre (llamada, WhatsApp o cita).
-- NUNCA retrocedas.
-- NUNCA reinicies la conversación.
-- NUNCA repitas preguntas ya respondidas.
-
-OBJETIVO COMERCIAL:
-- Guiar de forma natural hasta cerrar una cita o contacto directo.
-- Propón cierre con frases como:
-  - "¿Te parece si lo vemos por WhatsApp?"
-  - "Puedo agendar una llamada contigo hoy o mañana"
-`;
-
-    // ======================================================
-    // 🧠 Mensajes enviados a OpenAI
-    // ======================================================
-    const openAIMessages = [
-      { role: "system", content: systemPrompt },
-      ...safeMessages,
-    ];
-
-    // ======================================================
-    // 🤖 Llamada a OpenAI
-    // ======================================================
+    /* ---------------- OpenAI ---------------- */
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: openAIMessages,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPTS[language] },
+        ...messages,
+      ],
       temperature: 0.4,
     });
 
-    const reply = completion.choices[0].message.content;
+    const aiReply = completion.choices[0].message.content;
 
-    // ======================================================
-    // 📩 Extracción de leads (silenciosa)
-    // ======================================================
-    const nameRegex = /(mi nombre es|my name is)\s+([a-zA-ZÁÉÍÓÚáéíóúñÑ ]+)/i;
-    const phoneRegex = /(\+?\d[\d\s-]{6,})/;
-    const dateRegex =
-      /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre|\d{1,2}\/\d{1,2}\/\d{2,4})/i;
-    const eventRegex =
-      /(boda|wedding|cumpleaños|birthday|bautizo|evento|party)/i;
-
-    const phoneMatch = lastUserMessage.match(phoneRegex);
+    /* ---------------- Guardar lead ---------------- */
+    const lastUser = messages.filter(m => m.role === "user").at(-1)?.content || "";
+    const phoneMatch = lastUser.match(/(\+?\d[\d\s-]{6,})/);
 
     if (phoneMatch) {
       await saveLead({
-        name: lastUserMessage.match(nameRegex)?.[2]?.trim() || "No especificado",
         phone: phoneMatch[1].replace(/[\s-]/g, ""),
-        event: lastUserMessage.match(eventRegex)?.[0] || "No especificado",
-        date: lastUserMessage.match(dateRegex)?.[0] || null,
-        message: lastUserMessage,
+        message: lastUser,
         createdAt: new Date(),
       });
     }
 
-    return res.json({ reply });
+    return res.json({
+      reply: intro + aiReply,
+      meta: !hasIntroduction ? "intro" : undefined,
+      language,
+    });
 
   } catch (error) {
-    console.error("❌ Error del controlador de IA:", error);
+    console.error("❌ AI ERROR:", error);
     return res.status(500).json({
-      reply: "❌ Error interno al procesar el mensaje.",
+      reply: "❌ Error interno.",
     });
   }
 };
+
+
+
+
+
+
+
+
 
 
 

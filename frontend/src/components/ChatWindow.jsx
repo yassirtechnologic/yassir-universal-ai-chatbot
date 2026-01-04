@@ -1,5 +1,3 @@
-// src/components/ChatWindow.jsx
-
 import React, { useContext, useState, useEffect, useRef } from "react";
 import { ChatContext } from "../context/ChatContext";
 import { sendMessage } from "../services/api";
@@ -18,29 +16,39 @@ const ChatWindow = () => {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // ======================================================
-  // 📜 Scroll automático
-  // ======================================================
+  /* ======================================================
+     📜 Scroll automático
+  ====================================================== */
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // ======================================================
-  // 🚀 Enviar mensaje
-  // ======================================================
+  /* ======================================================
+     🗑️ Limpiar chat (CONFIRMADO Y DEFINIDO)
+  ====================================================== */
+  const handleClearChat = () => {
+    const confirmText =
+      language === "en"
+        ? "Are you sure you want to clear the conversation?"
+        : "¿Seguro que quieres borrar la conversación?";
+
+    if (window.confirm(confirmText)) {
+      clearChat();
+    }
+  };
+
+  /* ======================================================
+     🚀 Enviar mensaje
+  ====================================================== */
   const handleSend = async () => {
     if (!input.trim() || loading) return;
 
     const userInput = input;
 
-    // Mostrar mensaje del usuario
     addMessage("user", userInput);
     setInput("");
     setLoading(true);
 
-    // ======================================================
-    // 🧠 Construir historial REAL para el backend
-    // ======================================================
     const historyForBackend = [
       ...messages.map((m) => ({
         role: m.from === "user" ? "user" : "assistant",
@@ -50,13 +58,9 @@ const ChatWindow = () => {
     ];
 
     try {
-      // ✅ Payload COMPLETO (mensaje + idioma)
       const payload = {
         messages: historyForBackend,
-        language, // 🔥 CLAVE DEL MULTIIDIOMA
-      };
-
-      console.log("🚀 Payload enviado:", payload);
+    };
 
       const response = await sendMessage(payload);
 
@@ -72,12 +76,8 @@ const ChatWindow = () => {
 
       const replyText = response.reply;
 
-      // Crear mensaje vacío del bot (para typing)
       addMessage("bot", "", true);
 
-      // ======================================================
-      // ✍️ Typing effect
-      // ======================================================
       let index = 0;
       const interval = setInterval(() => {
         updateLastBotMessage(replyText.slice(0, index));
@@ -87,7 +87,6 @@ const ChatWindow = () => {
           clearInterval(interval);
         }
       }, 15);
-
     } catch (error) {
       console.error("❌ Error:", error);
 
@@ -103,11 +102,19 @@ const ChatWindow = () => {
   };
 
   return (
-    <div className="chat-container">
+    <div className="chat-container light">
       {/* HEADER */}
       <div className="chat-header">
-        Yassir – Eventos York & Katy
-        <button className="clear-btn" onClick={clearChat}>🗑️</button>
+        <span>Eventos York & Katy</span>
+
+        {/* Botón limpiar SIN texto */}
+        <button
+          className="clear-btn"
+          onClick={handleClearChat}
+          title={language === "en" ? "Clear chat" : "Limpiar chat"}
+        >
+          🗑️
+        </button>
       </div>
 
       {/* MENSAJES */}
@@ -118,7 +125,7 @@ const ChatWindow = () => {
               {msg.from === "user" ? "🧑" : "🤖"}
             </div>
 
-            <div className={`chat-bubble ${msg.from} animated`}>
+            <div className={`chat-bubble ${msg.from}`}>
               {msg.text}
             </div>
           </div>
@@ -153,6 +160,9 @@ const ChatWindow = () => {
 };
 
 export default ChatWindow;
+
+
+
 
 
 
