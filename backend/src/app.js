@@ -1,25 +1,27 @@
-// src/app.js
-import dotenv from "dotenv";
-dotenv.config();
-
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 
-import routes from "./routes/index.js"; 
+import routes from "./routes/index.js";
 // Este archivo es el que carga /ai y /leads
 
 const app = express();
 
-// Middlewares
+/* ======================================================
+   🛡️ Middlewares globales
+====================================================== */
 app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
-// API Routes agrupadas
+/* ======================================================
+   🔗 Rutas API
+====================================================== */
 app.use("/api", routes);
 
-// Test
+/* ======================================================
+   ✅ Health check
+====================================================== */
 app.get("/", (req, res) => {
   res.json({
     status: "API Running",
@@ -29,6 +31,7 @@ app.get("/", (req, res) => {
 });
 
 export default app;
+
 
 
 

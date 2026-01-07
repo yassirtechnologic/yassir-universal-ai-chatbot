@@ -5,12 +5,20 @@ import leadsRoutes from "./leads.routes.js";
 
 const router = Router();
 
-// Rutas de la IA (chatbot)
+/* ======================================================
+   🤖 Rutas de IA (Chatbot)
+   POST /api/ai/chat
+====================================================== */
 router.use("/ai", aiRoutes);
 
-// Rutas de Leads (Panel Admin)
+/* ======================================================
+   📊 Rutas de Leads (Panel / Admin)
+   GET  /api/leads
+   POST /api/leads
+====================================================== */
 router.use("/leads", leadsRoutes);
 
 export default router;
+
 
 

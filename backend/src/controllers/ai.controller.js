@@ -3,79 +3,50 @@ import OpenAI from "openai";
 import { saveLead } from "../services/lead.service.js";
 
 /* ======================================================
-   🔐 OpenAI Client
+   🔐 OpenAI Client (SDK NUEVO)
 ====================================================== */
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 /* ======================================================
-   🧠 SYSTEM PROMPTS POR IDIOMA
+   🌍 Detección simple de idioma
+====================================================== */
+const detectLanguage = (text = "") => {
+  const t = text.toLowerCase();
+
+  if (/\b(hallo|bitte|hochzeit|veranstaltung|personen|datum|uhr)\b/.test(t)) {
+    return "de";
+  }
+
+  if (/\b(hello|hi|please|event|price|wedding|people|date|time)\b/.test(t)) {
+    return "en";
+  }
+
+  return "es";
+};
+
+/* ======================================================
+   🧠 SYSTEM PROMPTS
 ====================================================== */
 const SYSTEM_PROMPTS = {
   es: `
 Eres Yassir, el asistente virtual oficial de Eventos York & Katy.
-
-REGLAS
-- Responde SIEMPRE en español.
-- No uses otros idiomas.
-- No te presentes (la presentación la gestiona el sistema).
-
-ESTILO
-- Cercano, natural y profesional.
-- Una sola pregunta a la vez.
-
-FLUJO
-inicio → tipo de evento
-tipo_evento → personas
-personas → fecha
-fecha → hora
-hora → contacto
-
-OBJETIVO
-- Guiar al cliente hasta un contacto real.
+Responde SIEMPRE en español.
+Guía al cliente hasta un contacto real.
+Una sola pregunta a la vez.
 `,
   en: `
-You are Yassir, the official virtual assistant of Eventos York & Katy.
-
-RULES
-- ALWAYS reply in English.
-- Do not introduce yourself (system handles that).
-
-STYLE
-- Friendly and professional.
-- One question at a time.
-
-FLOW
-start → event type
-event → people
-people → date
-date → time
-time → contact
-
-GOAL
-- Close a real lead.
+You are Yassir, the official assistant of Eventos York & Katy.
+Always reply in English.
+Guide the user to a real contact.
+One question at a time.
 `,
   de: `
-Du bist Yassir, der virtuelle Assistent von Eventos York & Katy.
-
-REGELN
-- Antworte IMMER auf Deutsch.
-- Stelle dich nicht vor (System übernimmt das).
-
-STIL
-- Freundlich und professionell.
-- Eine Frage nach der anderen.
-
-ABLAUF
-Start → Eventtyp
-Event → Personen
-Personen → Datum
-Datum → Uhrzeit
-Uhrzeit → Kontakt
-
-ZIEL
-- Einen echten Kontakt herstellen.
+Du bist Yassir, der Assistent von Eventos York & Katy.
+Antworte immer auf Deutsch.
+Führe den Kunden zu einem echten Kontakt.
+Eine Frage nach der anderen.
 `,
 };
 
@@ -84,28 +55,30 @@ ZIEL
 ====================================================== */
 export const handleAIChat = async (req, res) => {
   try {
-    const { messages, language } = req.body;
+    const { messages } = req.body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
-      return res.status(400).json({
-        reply: "⚠️ No message received.",
-      });
+      return res.status(400).json({ reply: "⚠️ No message received." });
     }
 
-    if (!language || !SYSTEM_PROMPTS[language]) {
-      return res.status(400).json({
-        reply: "⚠️ Language not provided.",
-      });
-    }
+    /* ---------- Idioma automático ---------- */
+    const lastUserMessage =
+      [...messages].reverse().find(m => m.role === "user")?.content || "";
 
-    /* ---------------- ¿Ya se presentó? ---------------- */
+    const language = detectLanguage(lastUserMessage);
+
+    /* ---------- Intro una sola vez ---------- */
     const hasIntroduction = messages.some(
       m =>
         m.role === "assistant" &&
-        m.meta === "intro"
+        typeof m.content === "string" &&
+        (
+          m.content.includes("soy Yassir") ||
+          m.content.includes("I'm Yassir") ||
+          m.content.includes("ich bin Yassir")
+        )
     );
 
-    /* ---------------- Presentación FORZADA ---------------- */
     let intro = "";
     if (!hasIntroduction) {
       if (language === "es")
@@ -116,34 +89,42 @@ export const handleAIChat = async (req, res) => {
         intro = "Hallo, ich bin Yassir, der virtuelle Assistent von Eventos York & Katy. ";
     }
 
-    /* ---------------- OpenAI ---------------- */
-    const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPTS[language] },
-        ...messages,
-      ],
-      temperature: 0.4,
+    /* ======================================================
+       🤖 OPENAI — FORMATO CORRECTO SDK NUEVO
+    ====================================================== */
+    const formattedMessages = [
+      {
+        role: "system",
+        content: [{ type: "text", text: SYSTEM_PROMPTS[language] }],
+      },
+      ...messages.map(m => ({
+        role: m.role,
+        content: [{ type: "text", text: m.content }],
+      })),
+    ];
+
+    const response = await client.responses.create({
+      model: "gpt-4.1-mini",
+      input: formattedMessages,
     });
 
-    const aiReply = completion.choices[0].message.content;
+    /* ---------- Extraer texto seguro ---------- */
+    const aiReply =
+      response.output?.[0]?.content?.[0]?.text ||
+      "❌ No response generated.";
 
-    /* ---------------- Guardar lead ---------------- */
-    const lastUser = messages.filter(m => m.role === "user").at(-1)?.content || "";
-    const phoneMatch = lastUser.match(/(\+?\d[\d\s-]{6,})/);
-
+    /* ---------- Guardar lead ---------- */
+    const phoneMatch = lastUserMessage.match(/(\+?\d[\d\s-]{6,})/);
     if (phoneMatch) {
       await saveLead({
         phone: phoneMatch[1].replace(/[\s-]/g, ""),
-        message: lastUser,
+        message: lastUserMessage,
         createdAt: new Date(),
       });
     }
 
     return res.json({
       reply: intro + aiReply,
-      meta: !hasIntroduction ? "intro" : undefined,
-      language,
     });
 
   } catch (error) {
@@ -153,6 +134,9 @@ export const handleAIChat = async (req, res) => {
     });
   }
 };
+
+
+
 
 
 

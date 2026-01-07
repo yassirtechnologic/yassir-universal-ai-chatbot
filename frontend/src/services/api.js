@@ -14,17 +14,15 @@ export const sendMessage = async (payload) => {
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.status}`);
-    }
-
     const data = await response.json();
 
-    if (!data?.reply) {
-      throw new Error("Invalid backend response");
+    // 👉 SI EL BACKEND RESPONDE ALGO, LO MOSTRAMOS
+    if (!response.ok) {
+      return {
+        reply: data?.reply || "❌ Error del servidor.",
+      };
     }
 
-    // 🔥 El backend SOLO devuelve texto
     return {
       reply: data.reply,
     };
@@ -34,10 +32,12 @@ export const sendMessage = async (payload) => {
 
     return {
       reply:
-        "🤖 I'm having a small technical issue. Please try again in a few seconds.",
+        "❌ No se pudo conectar con el servidor. Intenta más tarde.",
     };
   }
 };
+
+
 
 
 

@@ -6,7 +6,6 @@ import "../styles/chat.css";
 const ChatWindow = () => {
   const {
     messages,
-    language,
     addMessage,
     updateLastBotMessage,
     clearChat,
@@ -24,15 +23,10 @@ const ChatWindow = () => {
   }, [messages, loading]);
 
   /* ======================================================
-     🗑️ Limpiar chat (CONFIRMADO Y DEFINIDO)
+     🗑️ Limpiar chat (nueva sesión)
   ====================================================== */
   const handleClearChat = () => {
-    const confirmText =
-      language === "en"
-        ? "Are you sure you want to clear the conversation?"
-        : "¿Seguro que quieres borrar la conversación?";
-
-    if (window.confirm(confirmText)) {
+    if (window.confirm("¿Seguro que quieres borrar la conversación?")) {
       clearChat();
     }
   };
@@ -58,19 +52,12 @@ const ChatWindow = () => {
     ];
 
     try {
-      const payload = {
+      const response = await sendMessage({
         messages: historyForBackend,
-    };
+      });
 
-      const response = await sendMessage(payload);
-
-      if (!response || !response.reply) {
-        addMessage(
-          "bot",
-          language === "en"
-            ? "⚠️ Server response error."
-            : "⚠️ Error en la respuesta del servidor."
-        );
+      if (!response?.reply) {
+        addMessage("bot", "⚠️ Error en la respuesta del servidor.");
         return;
       }
 
@@ -89,12 +76,9 @@ const ChatWindow = () => {
       }, 15);
     } catch (error) {
       console.error("❌ Error:", error);
-
       addMessage(
         "bot",
-        language === "en"
-          ? "❌ Connection error. Please try again."
-          : "❌ Error al conectar con el servidor."
+        "❌ Error de conexión. Inténtalo de nuevo en unos segundos."
       );
     } finally {
       setLoading(false);
@@ -107,11 +91,10 @@ const ChatWindow = () => {
       <div className="chat-header">
         <span>Eventos York & Katy</span>
 
-        {/* Botón limpiar SIN texto */}
         <button
           className="clear-btn"
           onClick={handleClearChat}
-          title={language === "en" ? "Clear chat" : "Limpiar chat"}
+          title="Limpiar chat"
         >
           🗑️
         </button>
@@ -138,21 +121,12 @@ const ChatWindow = () => {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={
-            language === "en"
-              ? "Type your message..."
-              : "Escribe tu mensaje..."
-          }
+          placeholder="Escribe tu mensaje..."
           disabled={loading}
+          onKeyDown={(e) => e.key === "Enter" && handleSend()}
         />
         <button onClick={handleSend} disabled={loading}>
-          {loading
-            ? language === "en"
-              ? "Sending..."
-              : "Enviando..."
-            : language === "en"
-            ? "Send"
-            : "Enviar"}
+          {loading ? "Enviando..." : "Enviar"}
         </button>
       </div>
     </div>
@@ -160,6 +134,7 @@ const ChatWindow = () => {
 };
 
 export default ChatWindow;
+
 
 
 
