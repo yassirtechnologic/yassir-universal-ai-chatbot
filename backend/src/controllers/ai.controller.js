@@ -50,7 +50,6 @@ const normalizeMessages = (messages = []) => {
    🚀 CONTROLLER
 ====================================================== */
 export const handleAIChat = async (req, res) => {
-  console.log("🟢 AI.CONTROLLER NUEVO EJECUTÁNDOSE");
   try {
     const { messages } = req.body;
 
