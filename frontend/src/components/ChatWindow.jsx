@@ -32,26 +32,29 @@ const ChatWindow = () => {
   };
 
   /* ======================================================
-     🚀 Enviar mensaje
+     🚀 Enviar mensaje (EL BACKEND MANDA)
   ====================================================== */
   const handleSend = async () => {
     if (!input.trim() || loading) return;
 
-    const userInput = input;
+    const userInput = input.trim();
 
+    // 1️⃣ Mostrar mensaje del usuario
     addMessage("user", userInput);
     setInput("");
     setLoading(true);
 
-    const historyForBackend = [
-      ...messages.map((m) => ({
+    // 2️⃣ Preparar historial para backend
+    const historyForBackend = messages
+      .filter(m => !m.typing)
+      .map(m => ({
         role: m.from === "user" ? "user" : "assistant",
         content: m.text,
-      })),
-      { role: "user", content: userInput },
-    ];
+      }))
+      .concat({ role: "user", content: userInput });
 
     try {
+      // 3️⃣ Backend responde según SYSTEM PROMPT
       const response = await sendMessage({
         messages: historyForBackend,
       });
@@ -63,6 +66,7 @@ const ChatWindow = () => {
 
       const replyText = response.reply;
 
+      // 4️⃣ Mostrar respuesta del bot con typing
       addMessage("bot", "", true);
 
       let index = 0;
@@ -134,6 +138,9 @@ const ChatWindow = () => {
 };
 
 export default ChatWindow;
+
+
+
 
 
 

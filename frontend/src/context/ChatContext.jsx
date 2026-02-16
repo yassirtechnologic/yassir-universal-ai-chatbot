@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from "react";
+import React, { createContext, useState } from "react";
 
 export const ChatContext = createContext();
 
@@ -6,56 +6,25 @@ export const ChatContext = createContext();
    🧹 Limpieza segura de texto
 ====================================================== */
 const cleanText = (text = "") =>
-  text.replace(/[\uD800-\uDFFF]/g, "");
+  String(text).replace(/[\uD800-\uDFFF]/g, "");
 
 /* ======================================================
-   🧠 Chat Provider
+   🧠 Chat Provider (FRONTEND NEUTRO)
 ====================================================== */
 export const ChatProvider = ({ children }) => {
   const [messages, setMessages] = useState([]);
 
   /* ======================================================
-     🔥 Cargar historial (sesión)
-  ====================================================== */
-  useEffect(() => {
-    const saved = localStorage.getItem("yassir_chat_history");
-
-    if (!saved) return;
-
-    try {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) {
-        setMessages(parsed);
-      }
-    } catch {
-      localStorage.removeItem("yassir_chat_history");
-      setMessages([]);
-    }
-  }, []);
-
-  /* ======================================================
-     💾 Guardar historial
-  ====================================================== */
-  useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem(
-        "yassir_chat_history",
-        JSON.stringify(messages)
-      );
-    }
-  }, [messages]);
-
-  /* ======================================================
      ➕ Agregar mensaje
+     - NO persistente
+     - NO inventa comportamiento
   ====================================================== */
   const addMessage = (from, text, typing = false) => {
-    const cleaned = cleanText(text);
-
     setMessages((prev) => [
       ...prev,
       {
         from,
-        text: cleaned,
+        text: cleanText(text),
         typing,
       },
     ]);
@@ -63,14 +32,22 @@ export const ChatProvider = ({ children }) => {
 
   /* ======================================================
      ✏️ Typing effect (bot)
+     - Actualiza texto
+     - Finaliza typing correctamente
   ====================================================== */
-  const updateLastBotMessage = (newText) => {
+  const updateLastBotMessage = (newText, finish = false) => {
     setMessages((prev) => {
-      const updated = [...prev];
-      const last = updated.length - 1;
+      if (prev.length === 0) return prev;
 
-      if (updated[last]?.from === "bot") {
-        updated[last].text = cleanText(newText);
+      const updated = [...prev];
+      const lastIndex = updated.length - 1;
+
+      if (updated[lastIndex]?.from === "bot") {
+        updated[lastIndex] = {
+          ...updated[lastIndex],
+          text: cleanText(newText),
+          typing: finish ? false : updated[lastIndex].typing,
+        };
       }
 
       return updated;
@@ -78,10 +55,9 @@ export const ChatProvider = ({ children }) => {
   };
 
   /* ======================================================
-     🗑️ Reset total (nueva sesión)
+     🗑️ Reset total (nueva sesión real)
   ====================================================== */
   const clearChat = () => {
-    localStorage.removeItem("yassir_chat_history");
     setMessages([]);
   };
 
@@ -98,6 +74,7 @@ export const ChatProvider = ({ children }) => {
     </ChatContext.Provider>
   );
 };
+
 
 
 

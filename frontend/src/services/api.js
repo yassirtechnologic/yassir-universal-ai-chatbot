@@ -1,8 +1,6 @@
 // frontend/src/services/api.js
 
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "https://yassirbot-backend.onrender.com/api/ai/chat";
+const API_URL = "http://localhost:5000/api/ai/chat";
 
 export const sendMessage = async (payload) => {
   try {
@@ -16,7 +14,6 @@ export const sendMessage = async (payload) => {
 
     const data = await response.json();
 
-    // 👉 SI EL BACKEND RESPONDE ALGO, LO MOSTRAMOS
     if (!response.ok) {
       return {
         reply: data?.reply || "❌ Error del servidor.",
@@ -26,16 +23,15 @@ export const sendMessage = async (payload) => {
     return {
       reply: data.reply,
     };
-
   } catch (error) {
     console.error("❌ API error:", error);
 
     return {
-      reply:
-        "❌ No se pudo conectar con el servidor. Intenta más tarde.",
+      reply: "❌ No se pudo conectar con el servidor. Intenta más tarde.",
     };
   }
 };
+
 
 
 
