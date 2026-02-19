@@ -1,6 +1,6 @@
 // frontend/src/services/api.js
 
-const API_URL = "http://localhost:5000/api/ai/chat";
+const API_URL = "https://yassirbot-backend.onrender.com/api/ai/chat";
 
 export const sendMessage = async (payload) => {
   try {
@@ -9,7 +9,14 @@ export const sendMessage = async (payload) => {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        messages: [
+          {
+            role: "user",
+            content: payload.message,
+          },
+        ],
+      }),
     });
 
     const data = await response.json();
