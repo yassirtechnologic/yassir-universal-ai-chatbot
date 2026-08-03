@@ -9,9 +9,6 @@ const openai = new OpenAI({
 
 /* ======================================================
    🤖 Envío de mensajes a OpenAI
-   - NO lógica de negocio
-   - NO idioma
-   - NO presentación
 ====================================================== */
 export const sendToOpenAI = async ({
   messages,

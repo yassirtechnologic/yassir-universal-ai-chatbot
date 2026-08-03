@@ -1,8 +1,10 @@
+console.log("🚨 AI.CONTROLLER IMPORTADO 🚨");
 import "../load-env.js";
 import OpenAI from "openai";
 import { saveLead } from "../services/lead.service.js";
 import { sendEmailNotification } from "../services/notifyEmail.js";
 import { sendWhatsAppNotification } from "../services/notifyWhatsApp.js";
+import { processConversation } from "../conversation/conversationManager.js";
 
 /* ======================================================
    🔐 OpenAI Client (validado)
@@ -209,15 +211,25 @@ const wantsContact = (text = "") =>
 ====================================================== */
 export const handleAIChat = async (req, res) => {
   try {
-    console.log("✅ BACKEND IA ACTIVO");
+    console.log("🔥🔥🔥 NUEVO AI.CONTROLLER CARGADO 🔥🔥🔥");
+    console.log("1️⃣ handleAIChat ejecutado");
 
-    const { messages } = req.body;
+    const {
+
+        conversationId,
+
+        messages
+
+    } = req.body;
+
+    console.log("2️⃣ Body recibido:", req.body);
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.json({ reply: "No message received." });
     }
 
     const cleanMessages = normalizeMessages(messages);
+    console.log("3️⃣ Mensajes normalizados:", cleanMessages);
 
     const userMessages = cleanMessages.filter(m => m.role === "user");
     const lastUserMessage = userMessages.at(-1)?.content || "";
@@ -227,127 +239,63 @@ export const handleAIChat = async (req, res) => {
       wantsContact(m.content)
     );
 
-
     /* ======================================================
-       🤖 PRESENTACIÓN (UNA SOLA VEZ)
-    ====================================================== */
-    if (isFirstUserMessage) {
-      return res.json({
-        reply:
-          "Hola 👋 Soy Yassir, el asistente virtual de Eventos York & Katy. " +
-          "Puedes preguntarnos libremente sobre nuestros servicios y precios. " +
-          "Si lo deseas, más adelante podemos preparar un presupuesto personalizado.",
-      });
-    }
-
-    /* ======================================================
-       🧠 EXTRACCIÓN DE LEAD (SOLO SI QUIERE CONTACTO)
-    ====================================================== */
-    const leadData = {
-      nombre: null,
-      evento: null,
-      fecha: null,
-      contacto: null,
-    };
-
-    if (userAcceptedContact) {
-      userMessages.forEach(m => {
-        const text = m.content.toLowerCase();
-
-        if (
-          !leadData.nombre &&
-          /(me llamo|mi nombre es|soy)\s+/i.test(text)
-        ) {
-          leadData.nombre =
-            m.content.match(/(me llamo|mi nombre es|soy)\s+(.+)/i)?.[2] ||
-            m.content;
-        }
-
-        if (
-          !leadData.evento &&
-          /(boda|cumple|cumpleaños|evento|fiesta)/i.test(text)
-        ) {
-          leadData.evento = m.content;
-        }
-
-        if (
-          !leadData.fecha &&
-          (
-            /\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(text) ||
-            /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i.test(text)
-          )
-        ) {
-          leadData.fecha = m.content;
-        }
-
-        const phoneMatch = m.content.match(/(\+?\d[\d\s-]{7,})/);
-        if (!leadData.contacto && phoneMatch) {
-          leadData.contacto = phoneMatch[1].replace(/[\s-]/g, "");
-        }
-      });
-    }
-
-    /* ======================================================
-       💬 CONVERSACIÓN LIBRE (SIN PEDIR DATOS)
-    ====================================================== */
-    if (!userAcceptedContact) {
-      return res.json({
-        reply:
-          "Podemos ayudarte con información general y precios orientativos. " +
-          "Si quieres, también podemos preparar un presupuesto personalizado sin compromiso. " +
-          "¿Te gustaría que lo veamos por WhatsApp?",
-      });
-    }
-
-    /* ======================================================
-       📞 FLUJO DE CONTACTO (SOLO SI ACEPTA)
-    ====================================================== */
-    if (!leadData.nombre) {
-      return res.json({ reply: "Genial 😊 ¿Cuál es tu nombre?" });
-    }
-
-    if (!leadData.evento) {
-      return res.json({
-        reply: "Perfecto 🙌 ¿Qué tipo de evento deseas organizar?",
-      });
-    }
-
-    if (!leadData.fecha) {
-      return res.json({
-        reply: "Muy bien 👍 ¿Para qué fecha sería el evento?",
-      });
-    }
-
-    if (!leadData.contacto) {
-      return res.json({
-        reply: "Gracias 🙌 ¿Podrías dejarnos tu número de WhatsApp?",
-      });
-    }
-
-    /* ======================================================
-   ✅ CIERRE FINAL
+      🧠 NUEVO MOTOR DE CONVERSACIÓN (V2)
+      Solo análisis, todavía no reemplaza la lógica actual
     ====================================================== */
 
-    try {
-      await saveLead({
-        nombre: leadData.nombre,
-        evento: leadData.evento,
-        fecha: leadData.fecha,
-        contacto: leadData.contacto,
+    console.log("4️⃣ Voy a llamar a processConversation");
+    const conversationResult =
+      await processConversation({
+
+          conversationId,
+
+          messages: cleanMessages,
+
       });
 
-      await sendEmailNotification(leadData);
+    console.log("========== CONVERSATION ENGINE ==========");
+    console.log("🌍 Idioma:", conversationResult.language);
+    console.log("👤 Lead:", conversationResult.lead);
+    console.log("📋 Workflow:", conversationResult.workflow);
+    console.log("💬 Reply:", conversationResult.reply);
+    console.log("=========================================");
 
-      await sendWhatsAppNotification(leadData);
+    /* ======================================================
+      🤖 RESPUESTA DEL CONVERSATION ENGINE
+    ====================================================== */
 
-    } catch (actionError) {
-      console.error("❌ Error ejecutando acciones:", actionError);
+    if (conversationResult.reply) {
+
+      return res.json({
+
+        reply: conversationResult.reply,
+
+        workflow: conversationResult.workflow,
+
+        lead: conversationResult.lead,
+
+        language: conversationResult.language,
+
+        actions: conversationResult.actions,
+
+      });
+
     }
+    
+    /* ======================================================
+      Próximamente:
+      Ejecutar acciones automáticas
+    ====================================================== */
 
-    return res.json({
-      reply:
-        "Perfecto 🙌 Ya tenemos todo. Te hemos enviado un mensaje por WhatsApp ahora mismo.",
-    });
+    if (conversationResult.actions?.length) {
+
+        console.log(
+            "⚙️ Acciones:",
+            conversationResult.actions
+        );
+
+    }
 
       } catch (error) {
         console.error("❌ ERROR GENERAL:", error);

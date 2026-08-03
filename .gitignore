@@ -16,3 +16,11 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Credentials
+backend/credentials/
+backend/credentials/*.json
+
+# Environment
+.env
+*.env

@@ -1,42 +1,145 @@
-// frontend/src/services/api.js
+/* ======================================================
+   YASSIR TECH
 
-const API_URL = "https://yassirbot-backend.onrender.com/api/ai/chat";
+   File:
+   api.js
 
-export const sendMessage = async (payload) => {
-  try {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messages: [
-          {
-            role: "user",
-            content: payload.message,
-          },
-        ],
-      }),
-    });
+   Description:
+   Communication layer between the frontend
+   and the AI Backend.
 
-    const data = await response.json();
+   Responsibility:
+   Sends the complete conversation together
+   with a unique Conversation ID.
 
-    if (!response.ok) {
-      return {
-        reply: data?.reply || "❌ Error del servidor.",
-      };
+   Author:
+   Yassir Tech
+
+   Version:
+   3.0.0
+====================================================== */
+
+const API_URL = "http://localhost:5000/api/ai/chat";
+
+/* ======================================================
+   Conversation ID
+====================================================== */
+
+const STORAGE_KEY = "yassir_conversation_id";
+
+const getConversationId = () => {
+
+    let conversationId =
+        localStorage.getItem(STORAGE_KEY);
+
+    if (!conversationId) {
+
+        conversationId =
+            crypto.randomUUID();
+
+        localStorage.setItem(
+
+            STORAGE_KEY,
+
+            conversationId
+
+        );
+
+        console.log(
+            "🆕 Conversation ID:",
+            conversationId
+        );
+
     }
 
-    return {
-      reply: data.reply,
-    };
-  } catch (error) {
-    console.error("❌ API error:", error);
+    return conversationId;
 
-    return {
-      reply: "❌ No se pudo conectar con el servidor. Intenta más tarde.",
-    };
-  }
+};
+
+/* ======================================================
+   Reset Conversation
+====================================================== */
+
+export const resetConversation = () => {
+
+    localStorage.removeItem(
+        STORAGE_KEY
+    );
+
+};
+
+/* ======================================================
+   Send Conversation
+====================================================== */
+
+export const sendMessage = async (payload) => {
+
+    try {
+
+        const response =
+            await fetch(API_URL, {
+
+                method: "POST",
+
+                headers: {
+
+                    "Content-Type":
+                        "application/json",
+
+                },
+
+                body: JSON.stringify({
+
+                    conversationId:
+                        getConversationId(),
+
+                    messages:
+                        payload.messages || []
+
+                }),
+
+            });
+
+        const data =
+            await response.json();
+
+        if (!response.ok) {
+
+            return {
+
+                reply:
+
+                    data?.reply ||
+
+                    "❌ Error del servidor."
+
+            };
+
+        }
+
+        return data;
+
+    }
+
+    catch (error) {
+
+        console.error(
+
+            "❌ API Error:",
+
+            error
+
+        );
+
+        return {
+
+            reply:
+                "❌ No se pudo conectar con el servidor."
+
+        };
+
+    }
+
 };
 
 
