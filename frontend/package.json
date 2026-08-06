@@ -3,8 +3,6 @@
   "version": "1.0.0",
   "private": true,
 
-  "homepage": "https://yassirtecnologic.github.io/yassir-universal-ai-chatbot",
-
   "scripts": {
     "dev": "vite",
     "build": "vite build",
