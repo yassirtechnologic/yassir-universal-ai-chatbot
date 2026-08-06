@@ -8,30 +8,190 @@
    Smart Conversation Decision Engine.
 
    Responsibility:
-   Makes the workflow decision based on
-   the detected user intent.
+   Analyzes the detected intent and decides
+   the next action of the AI Commercial Agent.
+
+   This engine NEVER executes actions.
+   It only decides the next conversation step.
 
    Author:
    Yassir Tech
 
    Version:
-   2.0.0
+   4.0.0
 ====================================================== */
 
 import { analyzeIntent } from "./intentAnalyzer.js";
+
+/* ======================================================
+   Smart Decision
+====================================================== */
 
 export const smartDecision = (
 
     message = "",
 
-    workflow
+    workflow = {}
 
 ) => {
 
     const intent =
-        analyzeIntent(message);
 
-    switch (intent) {
+        analyzeIntent(
+
+            message
+
+        );
+
+    switch (
+
+        intent
+
+    ) {
+
+        /* ==========================================
+           Greetings
+        ========================================== */
+
+        case "GREETING":
+
+            return {
+
+                action: "GREETING",
+
+                intent
+
+            };
+
+        /* ==========================================
+           Goodbye
+        ========================================== */
+
+        case "GOODBYE":
+
+            return {
+
+                action: "GOODBYE",
+
+                intent
+
+            };
+
+        /* ==========================================
+           Confirmation
+        ========================================== */
+
+        case "CONFIRMATION":
+
+            return {
+
+                action: "CONTINUE",
+
+                intent
+
+            };
+
+        /* ==========================================
+           Negation
+        ========================================== */
+
+        case "NEGATION":
+
+            return {
+
+                action: "NEGATION",
+
+                intent
+
+            };
+
+        /* ==========================================
+           Price Question
+        ========================================== */
+
+        case "ASK_PRICE":
+
+            return {
+
+                action: "ANSWER_PRICE",
+
+                intent
+
+            };
+
+        /* ==========================================
+           Services Question
+        ========================================== */
+
+        case "ASK_SERVICE":
+
+            return {
+
+                action: "ANSWER_SERVICE",
+
+                intent
+
+            };
+
+        /* ==========================================
+           Location Question
+        ========================================== */
+
+        case "ASK_LOCATION":
+
+            return {
+
+                action: "ANSWER_LOCATION",
+
+                intent
+
+            };
+
+        /* ==========================================
+           Availability Question
+        ========================================== */
+
+        case "ASK_AVAILABILITY":
+
+            return {
+
+                action: "ANSWER_AVAILABILITY",
+
+                intent
+
+            };
+
+        /* ==========================================
+           Generic Question
+        ========================================== */
+
+        case "QUESTION":
+
+            return {
+
+                action: "ANSWER_QUESTION",
+
+                intent
+
+            };
+
+        /* ==========================================
+           Topic Change
+        ========================================== */
+
+        case "TOPIC_CHANGE":
+
+            return {
+
+                action: "CHANGE_TOPIC",
+
+                intent
+
+            };
+
+        /* ==========================================
+           Unknown
+        ========================================== */
 
         case "UNKNOWN":
 
@@ -45,45 +205,9 @@ export const smartDecision = (
 
             };
 
-        case "CONFIRMATION":
-
-            return {
-
-                action: "CONTINUE",
-
-                intent
-
-            };
-
-        case "NEGATION":
-
-            return {
-
-                action: "NEGATION",
-
-                intent
-
-            };
-
-        case "QUESTION":
-
-            return {
-
-                action: "ANSWER_QUESTION",
-
-                intent
-
-            };
-
-        case "TOPIC_CHANGE":
-
-            return {
-
-                action: "CHANGE_TOPIC",
-
-                intent
-
-            };
+        /* ==========================================
+           Normal Answer
+        ========================================== */
 
         case "ANSWER":
 
@@ -91,7 +215,7 @@ export const smartDecision = (
 
             return {
 
-                action: "NORMAL",
+                action: "CONTINUE_WORKFLOW",
 
                 intent
 

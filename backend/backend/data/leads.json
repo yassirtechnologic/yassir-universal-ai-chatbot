@@ -142,5 +142,22 @@
     "presupuesto": 2000,
     "servicios": [],
     "comentarios": "Sin comentarios"
+  },
+  {
+    "id": "a1b0470d-dc33-4383-8fb0-f21dcdeb325d",
+    "createdAt": "2026-08-04T08:40:07.618Z",
+    "status": "Nuevo",
+    "source": "Website Chatbot",
+    "language": "es",
+    "nombre": "andres",
+    "telefono": "653547438",
+    "email": "andres@gmail.com",
+    "evento": "boda",
+    "fecha": "2026-09-20",
+    "ciudad": "leon nicaragua",
+    "invitados": 100,
+    "presupuesto": 5000,
+    "servicios": [],
+    "comentarios": "Sin comentarios"
   }
 ]

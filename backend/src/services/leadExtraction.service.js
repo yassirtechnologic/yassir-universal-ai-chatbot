@@ -11,18 +11,22 @@
    Uses OpenAI to extract structured lead
    information from a conversation.
 
+   If OpenAI is unavailable the chatbot
+   continues working using regex extraction.
+
    Author:
    Yassir Tech
 
    Version:
-   2.0.0
+   3.0.0
 ====================================================== */
 
 import { sendToOpenAI } from "./openai.service.js";
 
 const today = new Date();
 
-const currentDate = today.toISOString().split("T")[0];
+const currentDate =
+    today.toISOString().split("T")[0];
 
 const EMPTY_LEAD = {
 
@@ -34,12 +38,16 @@ const EMPTY_LEAD = {
     ciudad: null,
     invitados: null,
     presupuesto: null,
-    servicios: null,
+    servicios: [],
     comentarios: null
 
 };
 
-export const extractLeadWithAI = async (messages = []) => {
+export const extractLeadWithAI = async (
+
+    messages = []
+
+) => {
 
     const systemPrompt = `
 You are an information extraction engine.
@@ -110,24 +118,49 @@ The JSON must always contain:
 }
 `;
 
-    const response = await sendToOpenAI({
+    let response;
 
-        messages: [
+    try {
 
-            {
-                role: "system",
-                content: systemPrompt
-            },
+        response = await sendToOpenAI({
 
-            ...messages
+            messages: [
 
-        ],
+                {
 
-        temperature: 0,
+                    role: "system",
 
-        maxTokens: 300
+                    content: systemPrompt
 
-    });
+                },
+
+                ...messages
+
+            ],
+
+            temperature: 0,
+
+            maxTokens: 300
+
+        });
+
+    } catch (error) {
+
+        console.error(
+
+            "❌ OpenAI Lead Extraction Error:",
+
+            error.message
+
+        );
+
+        return {
+
+            ...EMPTY_LEAD
+
+        };
+
+    }
 
     try {
 
@@ -139,12 +172,13 @@ The JSON must always contain:
 
         };
 
-        /* ==========================================
-           Normalización backend
-        ========================================== */
-
         const lastMessage =
-            messages.at(-1)?.content?.trim().toLowerCase() || "";
+
+            messages
+                .at(-1)
+                ?.content
+                ?.trim()
+                .toLowerCase() || "";
 
         const noResponses = [
 
@@ -165,11 +199,16 @@ The JSON must always contain:
 
             !lead.comentarios &&
 
-            noResponses.includes(lastMessage)
+            noResponses.includes(
+
+                lastMessage
+
+            )
 
         ) {
 
             lead.comentarios =
+
                 "Sin comentarios";
 
         }
@@ -178,7 +217,11 @@ The JSON must always contain:
 
             lead.servicios &&
 
-            !Array.isArray(lead.servicios)
+            !Array.isArray(
+
+                lead.servicios
+
+            )
 
         ) {
 
@@ -195,8 +238,11 @@ The JSON must always contain:
     } catch (error) {
 
         console.error(
-            "Lead Extraction Error:",
+
+            "❌ JSON Lead Parsing Error:",
+
             error
+
         );
 
         return {

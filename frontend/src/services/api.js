@@ -19,7 +19,7 @@
    3.0.0
 ====================================================== */
 
-const API_URL = "https://yassirbot-backend.onrender.com/api/ai/chat";
+const API_URL = "http://yassirbot-backend.onrender.com/api/ai/chat";
 
 /* ======================================================
    Conversation ID

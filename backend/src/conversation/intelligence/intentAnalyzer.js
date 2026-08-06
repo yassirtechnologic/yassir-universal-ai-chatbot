@@ -19,6 +19,184 @@
    2.0.0
 ====================================================== */
 
+/* ======================================================
+   Greeting
+====================================================== */
+
+const GREETING_PATTERNS = [
+
+    "hola",
+
+    "buenas",
+
+    "buenos dias",
+
+    "buenos días",
+
+    "buenas tardes",
+
+    "buenas noches",
+
+    "hey",
+
+    "hello"
+
+];
+
+/* ======================================================
+   Goodbye
+====================================================== */
+
+const GOODBYE_PATTERNS = [
+
+    "adios",
+
+    "adiós",
+
+    "hasta luego",
+
+    "nos vemos",
+
+    "gracias",
+
+    "muchas gracias",
+
+    "bye",
+
+    "hasta pronto"
+
+];
+
+/* ======================================================
+   Ask Price
+====================================================== */
+
+const ASK_PRICE_PATTERNS = [
+
+    "precio",
+
+    "precios",
+
+    "cuánto cuesta",
+
+    "coste",
+
+    "valor",
+
+    "tarifa",
+
+    "cuanto vale",
+
+    "cuanto costaria",
+
+    "costaria",
+
+    "costaría",
+
+    "costo",
+
+    "costos",
+
+    "vale",
+
+    "cotizacion",
+
+    "presupuesto"
+
+];
+
+/* ======================================================
+   Ask Services
+====================================================== */
+
+const ASK_SERVICE_PATTERNS = [
+
+    "servicio",
+
+    "servicios",
+
+    "catering",
+
+    "decoracion",
+
+    "decoración",
+
+    "fotografia",
+
+    "fotografía",
+
+    "dj",
+
+    "musica",
+
+    "música",
+
+    "animacion",
+
+    "organizacion",
+
+    "organización",
+
+    "barra libre",
+
+    "fotografo",
+
+    "fotógrafo",
+
+    "video",
+
+    "vídeo",
+
+    "musica en vivo",
+    
+    "música en vivo",
+
+    "animación"
+
+];
+
+/* ======================================================
+   Ask Location
+====================================================== */
+
+const ASK_LOCATION_PATTERNS = [
+
+    "donde estan",
+
+    "dónde están",
+
+    "ubicacion",
+
+    "ubicación",
+
+    "direccion",
+
+    "dirección",
+
+    "donde se encuentran"
+
+];
+
+/* ======================================================
+   Ask Availability
+====================================================== */
+
+const ASK_AVAILABILITY_PATTERNS = [
+
+    "disponibilidad",
+
+    "disponible",
+
+    "tienen fecha",
+
+    "teneis fecha",
+
+    "tenéis fecha",
+
+    "libre"
+
+];
+
 const UNKNOWN_PATTERNS = [
 
     "no lo se",
@@ -73,23 +251,88 @@ export const analyzeIntent = (text = "") => {
             .trim();
 
     /* ===========================
+       GREETING
+    =========================== */
+
+    if (
+        GREETING_PATTERNS.some(
+            pattern => message.includes(pattern)
+        )
+    ) {
+        return "GREETING";
+    }
+
+    /* ===========================
+       GOODBYE
+    =========================== */
+
+    if (
+        GOODBYE_PATTERNS.some(
+            pattern => message.includes(pattern)
+        )
+    ) {
+        return "GOODBYE";
+    }
+
+    /* ===========================
+       ASK PRICE
+       (Alta prioridad)
+    =========================== */
+
+    if (
+        ASK_PRICE_PATTERNS.some(
+            pattern => message.includes(pattern)
+        )
+    ) {
+        return "ASK_PRICE";
+    }
+
+    /* ===========================
+       ASK SERVICES
+    =========================== */
+
+    if (
+        ASK_SERVICE_PATTERNS.some(
+            pattern => message.includes(pattern)
+        )
+    ) {
+        return "ASK_SERVICE";
+    }
+
+    /* ===========================
+       ASK LOCATION
+    =========================== */
+
+    if (
+        ASK_LOCATION_PATTERNS.some(
+            pattern => message.includes(pattern)
+        )
+    ) {
+        return "ASK_LOCATION";
+    }
+
+    /* ===========================
+       ASK AVAILABILITY
+    =========================== */
+
+    if (
+        ASK_AVAILABILITY_PATTERNS.some(
+            pattern => message.includes(pattern)
+        )
+    ) {
+        return "ASK_AVAILABILITY";
+    }
+
+    /* ===========================
        UNKNOWN
     =========================== */
 
     if (
-
         UNKNOWN_PATTERNS.some(
-
-            pattern =>
-
-                message.includes(pattern)
-
+            pattern => message.includes(pattern)
         )
-
     ) {
-
         return "UNKNOWN";
-
     }
 
     /* ===========================
@@ -97,17 +340,11 @@ export const analyzeIntent = (text = "") => {
     =========================== */
 
     if (
-
         CONFIRMATION_PATTERNS.includes(
-
             message
-
         )
-
     ) {
-
         return "CONFIRMATION";
-
     }
 
     /* ===========================
@@ -115,17 +352,11 @@ export const analyzeIntent = (text = "") => {
     =========================== */
 
     if (
-
         NEGATION_PATTERNS.includes(
-
             message
-
         )
-
     ) {
-
         return "NEGATION";
-
     }
 
     /* ===========================
@@ -133,19 +364,16 @@ export const analyzeIntent = (text = "") => {
     =========================== */
 
     if (
-
         message.includes("?") ||
-
-        message.includes("cuanto") ||
-
-        message.includes("cuánto") ||
-
-        message.includes("precio")
-
+        message.includes("¿") ||
+        message.includes("como") ||
+        message.includes("cómo") ||
+        message.includes("cuando") ||
+        message.includes("cuándo") ||
+        message.includes("donde") ||
+        message.includes("dónde")
     ) {
-
         return "QUESTION";
-
     }
 
     /* ===========================
@@ -153,17 +381,11 @@ export const analyzeIntent = (text = "") => {
     =========================== */
 
     if (
-
         message.includes("tambien") ||
-
         message.includes("también") ||
-
         message.includes("otra cosa")
-
     ) {
-
         return "TOPIC_CHANGE";
-
     }
 
     return "ANSWER";
