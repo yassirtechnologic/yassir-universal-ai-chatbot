@@ -10,13 +10,14 @@
    Responsibility:
    Processes Yassir Technologic conversations,
    extracts and maintains commercial lead information,
-   manages conversation state and generates AI responses.
+   persists qualified opportunities and generates
+   AI responses.
 
    Author:
    Yassir Technologic
 
    Version:
-   2.0.0
+   2.1.0
 ========================================================== */
 
 
@@ -47,8 +48,13 @@ import {
 import {
     getTechSession,
     updateTechSessionLanguage,
-    updateTechSessionLead
+    updateTechSessionLead,
+    markTechLeadPersisted
 } from "./session.js";
+
+import {
+    upsertTechLead
+} from "./techLead.service.js";
 
 
 /* ==========================================================
@@ -143,15 +149,6 @@ function getLastUserMessage(
    DETECT LANGUAGE
 ========================================================== */
 
-/*
- * Yassir Technologic currently supports:
- *
- * - Spanish
- * - English
- *
- * Spanish remains the safe fallback.
- */
-
 function detectLanguage(
     text = ""
 ) {
@@ -186,14 +183,6 @@ function detectLanguage(
    BUILD COMMERCIAL CONTEXT
 ========================================================== */
 
-/*
- * This context tells the conversational model what
- * commercial information has already been extracted.
- *
- * It is internal context.
- * The assistant must not expose it as JSON to the visitor.
- */
-
 function buildCommercialContext(
     session
 ) {
@@ -225,9 +214,11 @@ ${JSON.stringify(
 
 Commercial qualification:
 
-${session.qualified
-    ? "The opportunity currently has enough basic information to be considered qualified."
-    : "The opportunity is not yet basically qualified."}
+${
+    session.qualified
+        ? "The opportunity currently has enough basic information to be considered qualified."
+        : "The opportunity is not yet basically qualified."
+}
 
 IMPORTANT:
 
@@ -241,6 +232,135 @@ is genuinely relevant.
 
 Do not turn the conversation into a form or interrogation.
 `;
+
+}
+
+
+/* ==========================================================
+   PERSIST QUALIFIED OPPORTUNITY
+========================================================== */
+
+async function persistQualifiedOpportunity({
+
+    conversationId,
+
+    session,
+
+    language
+
+}) {
+
+    if (
+        session.qualified !== true
+    ) {
+
+        return {
+
+            attempted:
+                false,
+
+            saved:
+                false,
+
+            created:
+                false,
+
+            updated:
+                false,
+
+            result:
+                null
+
+        };
+
+    }
+
+
+    const result =
+        await upsertTechLead({
+
+            conversationId,
+
+            lead:
+                session.lead,
+
+            language,
+
+            qualified:
+                session.qualified
+
+        });
+
+
+    if (
+        !result?.saved
+    ) {
+
+        console.error(
+            "❌ Yassir Technologic opportunity persistence failed:",
+            result
+        );
+
+
+        return {
+
+            attempted:
+                true,
+
+            saved:
+                false,
+
+            created:
+                false,
+
+            updated:
+                false,
+
+            result
+
+        };
+
+    }
+
+
+    markTechLeadPersisted(
+
+        conversationId,
+
+        result.lead
+
+    );
+
+
+    console.log(
+        result.created
+            ? "💾 Yassir Technologic opportunity created:"
+            : "🔄 Yassir Technologic opportunity updated:",
+        result.lead?.id
+    );
+
+
+    return {
+
+        attempted:
+            true,
+
+        saved:
+            true,
+
+        created:
+            Boolean(
+                result.created
+            ),
+
+        updated:
+            Boolean(
+                result.updated
+            ),
+
+        result
+
+    };
 
 }
 
@@ -373,10 +493,10 @@ export async function processYassirTechnologicConversation({
 
 
     /* ======================================================
-       SAVE COMMERCIAL LEAD
+       SAVE LEAD IN SESSION
     ====================================================== */
 
-    const updatedSession =
+    let updatedSession =
         updateTechSessionLead(
 
             conversationId,
@@ -396,6 +516,34 @@ export async function processYassirTechnologicConversation({
         "🎯 Yassir Technologic qualified:",
         updatedSession.qualified
     );
+
+
+    /* ======================================================
+       PERSIST QUALIFIED OPPORTUNITY
+    ====================================================== */
+
+    const persistence =
+        await persistQualifiedOpportunity({
+
+            conversationId,
+
+            session:
+                updatedSession,
+
+            language
+
+        });
+
+
+    /*
+     * Persistence may update the session with
+     * saved, leadId, savedAt and updatedAt.
+     */
+
+    updatedSession =
+        getTechSession(
+            conversationId
+        );
 
 
     /* ======================================================
@@ -503,7 +651,15 @@ export async function processYassirTechnologicConversation({
                 cleanMessages.length,
 
             qualified:
-                updatedSession.qualified
+                updatedSession.qualified,
+
+            persisted:
+                updatedSession.persistence
+                    ?.saved === true,
+
+            leadId:
+                updatedSession.persistence
+                    ?.leadId || null
 
         }
     );
@@ -530,6 +686,24 @@ export async function processYassirTechnologicConversation({
 
         qualified:
             updatedSession.qualified,
+
+        persistence: {
+
+            saved:
+                updatedSession.persistence
+                    ?.saved === true,
+
+            leadId:
+                updatedSession.persistence
+                    ?.leadId || null,
+
+            created:
+                persistence.created,
+
+            updated:
+                persistence.updated
+
+        },
 
         workflow:
             null,
