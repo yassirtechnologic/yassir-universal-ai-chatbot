@@ -211,10 +211,11 @@ const wantsContact = (text = "") =>
 ====================================================== */
 export const handleAIChat = async (req, res) => {
   try {
-    console.log("🔥🔥🔥 NUEVO AI.CONTROLLER CARGADO 🔥🔥🔥");
     console.log("1️⃣ handleAIChat ejecutado");
 
     const {
+
+        assistantId,
 
         conversationId,
 
@@ -244,13 +245,27 @@ export const handleAIChat = async (req, res) => {
       Solo análisis, todavía no reemplaza la lógica actual
     ====================================================== */
 
-    console.log("4️⃣ Voy a llamar a processConversation");
+    console.log(
+        "4️⃣ Procesando conversación:",
+        {
+            assistantId:
+                assistantId || "default",
+
+            conversationId,
+
+            messages:
+                cleanMessages.length
+        }
+    );
     const conversationResult =
       await processConversation({
 
+          assistantId,
+
           conversationId,
 
-          messages: cleanMessages,
+          messages:
+              cleanMessages
 
       });
 
@@ -269,15 +284,25 @@ export const handleAIChat = async (req, res) => {
 
       return res.json({
 
-        reply: conversationResult.reply,
+          assistantId:
+              conversationResult.assistantId ||
+              assistantId ||
+              "eventos-york-katy",
 
-        workflow: conversationResult.workflow,
+          reply:
+              conversationResult.reply,
 
-        lead: conversationResult.lead,
+          workflow:
+              conversationResult.workflow,
 
-        language: conversationResult.language,
+          lead:
+              conversationResult.lead,
 
-        actions: conversationResult.actions,
+          language:
+              conversationResult.language,
+
+          actions:
+              conversationResult.actions
 
       });
 

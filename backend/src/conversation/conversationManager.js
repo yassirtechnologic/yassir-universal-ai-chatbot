@@ -5,17 +5,44 @@
    conversationManager.js
 
    Description:
-   Central conversation engine.
+   Central multi-assistant conversation engine.
 
    Responsibility:
-   Coordinates the complete conversation flow.
+   Routes each conversation to the correct assistant
+   engine while preserving the existing Eventos York
+   & Katy conversation workflow.
 
    Author:
    Yassir Tech
 
    Version:
-   4.1.0
+   4.2.0
 ====================================================== */
+
+
+/* ==========================================================
+   ASSISTANTS
+========================================================== */
+
+import {
+
+    DEFAULT_ASSISTANT_ID,
+
+    hasAssistant
+
+} from "../assistants/registry.js";
+
+
+import {
+
+    processYassirTechnologicConversation
+
+} from "../assistants/yassir-technologic/engine.js";
+
+
+/* ==========================================================
+   EVENTOS YORK & KATY ENGINE DEPENDENCIES
+========================================================== */
 
 import { detectLanguage } from "./languageDetector.js";
 import { extractLead } from "./leadExtractor.js";
@@ -28,6 +55,7 @@ import { sendToOpenAI } from "../services/openai.service.js";
 import { mergeLead } from "../utils/mergeLead.js";
 import { extractLeadWithAI } from "../services/leadExtraction.service.js";
 import { executeActions } from "../actions/actionExecutor.js";
+
 import {
 
     getConversationSession,
@@ -45,23 +73,146 @@ import {
     clearConversationSession
 
 } from "./conversationSession.js";
+
 import { runWorkflowEngine } from "./engine/workflowEngine.js";
 import { knowledgeEngine } from "./knowledge/knowledgeEngine.js";
 import { conversationRouter } from "./conversationRouter.js";
 import { commercialBrain } from "./brain/commercialBrain.js";
 import { reasoningEngine } from "./brain/reasoningEngine.js";
 
-// Próximas fases
-// import { extractLeadWithAI } from "../services/leadExtraction.service.js";
-// import { executeActions } from "../actions/actionExecutor.js";
+
+/* ==========================================================
+   NORMALIZE ASSISTANT ID
+========================================================== */
+
+function normalizeAssistantId(
+    assistantId
+) {
+
+    if (
+        typeof assistantId !== "string"
+    ) {
+
+        return DEFAULT_ASSISTANT_ID;
+
+    }
+
+
+    const normalized =
+        assistantId
+            .trim()
+            .toLowerCase();
+
+
+    return normalized ||
+        DEFAULT_ASSISTANT_ID;
+
+}
+
+
+/* ==========================================================
+   PROCESS CONVERSATION
+========================================================== */
 
 export const processConversation = async ({
 
+    assistantId =
+        DEFAULT_ASSISTANT_ID,
+
     conversationId,
 
-    messages = [],
+    messages = []
 
 }) => {
+
+    /* ======================================================
+       ASSISTANT
+    ====================================================== */
+
+    const resolvedAssistantId =
+        normalizeAssistantId(
+            assistantId
+        );
+
+
+    /* ======================================================
+       VALIDATE ASSISTANT
+    ====================================================== */
+
+    if (
+        !hasAssistant(
+            resolvedAssistantId
+        )
+    ) {
+
+        throw new Error(
+            `Unknown assistant: "${resolvedAssistantId}".`
+        );
+
+    }
+
+
+    /* ======================================================
+       YASSIR TECHNOLOGIC
+    ====================================================== */
+
+    /*
+     * Yassir Technologic has its own conversation engine.
+     *
+     * It must return before entering any Eventos-specific:
+     *
+     * - lead extraction
+     * - workflow
+     * - event questions
+     * - event actions
+     * - event completion messages
+     */
+
+    if (
+        resolvedAssistantId ===
+        "yassir-technologic"
+    ) {
+
+        return processYassirTechnologicConversation({
+
+            conversationId,
+
+            messages
+
+        });
+
+    }
+
+
+    /* ======================================================
+       ENGINE SAFETY
+    ====================================================== */
+
+    /*
+     * At this stage only Eventos York & Katy uses
+     * the legacy workflow below.
+     *
+     * This explicit check prevents future registered
+     * assistants from accidentally entering the
+     * Eventos conversation engine.
+     */
+
+    if (
+        resolvedAssistantId !==
+        DEFAULT_ASSISTANT_ID
+    ) {
+
+        throw new Error(
+            `No conversation engine configured for assistant "${resolvedAssistantId}".`
+        );
+
+    }
+
+
+    /* ======================================================
+       EVENTOS YORK & KATY
+    ====================================================== */
+
 
     /* ==========================================
        Último mensaje del usuario
@@ -69,6 +220,7 @@ export const processConversation = async ({
 
     const lastUserMessage =
         messages.at(-1)?.content || "";
+
 
     /* ==========================================
        Idioma
@@ -78,6 +230,7 @@ export const processConversation = async ({
         detectLanguage(
             lastUserMessage
         );
+
 
     updateConversationSession(
 
@@ -91,13 +244,15 @@ export const processConversation = async ({
 
     );
 
+
     const session =
         getConversationSession(
             conversationId
         );
 
+
     /* ==========================================
-    Conversación finalizada
+       Conversación finalizada
     ========================================== */
 
     if (
@@ -131,17 +286,27 @@ export const processConversation = async ({
 
     }
 
+
     console.log(
         "🧠 Conversation Session:",
         session
     );
+
 
     /* ==========================================
        Prompt del sistema
     ========================================== */
 
     const systemPrompt =
-        buildPrompt(language);
+        buildPrompt({
+
+            assistantId:
+                resolvedAssistantId,
+
+            language
+
+        });
+
 
     /* ==========================================
        Historial para GPT
@@ -150,35 +315,46 @@ export const processConversation = async ({
     const conversation = [
 
         {
-            role: "system",
-            content: systemPrompt,
+
+            role:
+                "system",
+
+            content:
+                systemPrompt
+
         },
 
-        ...messages,
+        ...messages
 
     ];
 
+
     /* ==========================================
-    Lead almacenado en sesión
+       Lead almacenado en sesión
     ========================================== */
 
     const previousLead =
         session.lead || {};
 
+
     /* ==========================================
-    Extracción mediante reglas
+       Extracción mediante reglas
     ========================================== */
 
     const regexLead =
-        extractLead(messages);
+        extractLead(
+            messages
+        );
+
 
     console.log(
         "🟡 Regex Lead:",
         regexLead
     );
 
+
     /* ==========================================
-    Extracción mediante IA
+       Extracción mediante IA
     ========================================== */
 
     const aiLead =
@@ -186,13 +362,15 @@ export const processConversation = async ({
             messages
         );
 
+
     console.log(
         "🟢 AI Lead:",
         aiLead
     );
 
+
     /* ==========================================
-    Merge del Lead
+       Merge del Lead
     ========================================== */
 
     const extractedLead =
@@ -201,14 +379,16 @@ export const processConversation = async ({
             aiLead
         );
 
+
     const lead =
         mergeLead(
             previousLead,
             extractedLead
         );
 
+
     /* ==========================================
-    Guardar Lead
+       Guardar Lead
     ========================================== */
 
     updateLead(
@@ -219,19 +399,22 @@ export const processConversation = async ({
 
     );
 
+
     console.log(
         "🔵 Lead Final:",
         lead
     );
 
+
     /* ==========================================
-    Estado del Workflow
+       Estado del Workflow
     ========================================== */
 
     const workflow =
         getWorkflowState(
             lead
         );
+
 
     updateWorkflow(
 
@@ -241,10 +424,12 @@ export const processConversation = async ({
 
     );
 
+
     console.log(
         "🟣 Workflow:",
         workflow
     );
+
 
     const decision =
         smartDecision(
@@ -252,59 +437,71 @@ export const processConversation = async ({
             workflow
         );
 
+
     console.log(
         "🧠 Smart Decision:",
         decision
     );
 
+
     /* ==========================================
-    Commercial Brain
+       Commercial Brain
     ========================================== */
 
-    const brain = commercialBrain({
+    const brain =
+        commercialBrain({
 
-        lead,
+            lead,
 
-        workflow,
+            workflow,
 
-        intent: decision.intent,
+            intent:
+                decision.intent,
 
-        message: lastUserMessage,
+            message:
+                lastUserMessage,
 
-        session
+            session
 
-    });
+        });
+
 
     console.log(
         "🧠 Commercial Brain:",
         brain
     );
 
+
     /* ==========================================
-    Reasoning Engine
+       Reasoning Engine
     ========================================== */
 
-    const reasoning = reasoningEngine({
+    const reasoning =
+        reasoningEngine({
 
-        decision: brain.decision,
+            decision:
+                brain.decision,
 
-        lead,
+            lead,
 
-        message: decision,
+            message:
+                decision,
 
-        workflow,
+            workflow,
 
-        language
+            language
 
-    });
+        });
+
 
     console.log(
         "🧠 Reasoning Engine:",
         reasoning
     );
 
+
     /* ==========================================
-    Reasoning Response
+       Reasoning Response
     ========================================== */
 
     switch (
@@ -313,15 +510,17 @@ export const processConversation = async ({
 
     ) {
 
+
         /* ======================================
-        Knowledge
+           Knowledge
         ====================================== */
 
         case "KNOWLEDGE":
 
             return {
 
-                success: true,
+                success:
+                    true,
 
                 language,
 
@@ -345,12 +544,14 @@ export const processConversation = async ({
 
                     ),
 
-                actions: []
+                actions:
+                    []
 
             };
 
+
         /* ======================================
-        Recommendation
+           Recommendation
         ====================================== */
 
         case "RECOMMENDATION":
@@ -365,16 +566,18 @@ export const processConversation = async ({
 
             break;
 
+
         /* ======================================
-        Finish
+           Finish
         ====================================== */
 
         case "FINISH":
 
             break;
 
+
         /* ======================================
-        Workflow
+           Workflow
         ====================================== */
 
         case "WORKFLOW":
@@ -385,47 +588,68 @@ export const processConversation = async ({
 
     }
 
+
     /* ==========================================
-    Commercial Brain Decision
+       Commercial Brain Decision
     ========================================== */
 
-    const router = conversationRouter({
+    const router =
+        conversationRouter({
 
-        decision: brain.decision,
+            decision:
+                brain.decision,
 
-        language,
+            language,
 
-        lead,
+            lead,
 
-        workflow
+            workflow
 
-    });
+        });
+
 
     /* ==========================================
        Primera interacción
     ========================================== */
 
     const isFirstMessage =
-        messages.filter(m => m.role === "user").length === 1;
+        messages.filter(
+            (message) =>
+                message.role === "user"
+        ).length === 1;
 
-    if (isFirstMessage) {
+
+    if (
+        isFirstMessage
+    ) {
 
         const intro =
+
             "¡Hola! 👋 Soy Yassir, el asistente virtual de Eventos York & Katy.\n\n" +
+
             "Será un placer ayudarte a organizar un evento inolvidable.\n\n" +
+
             "Puedo ayudarte con bodas, cumpleaños, bautizos, comuniones, eventos corporativos y mucho más.\n\n" +
+
             "😊 Antes de comenzar me gustaría conocerte un poco.\n\n";
+
 
         const workflowReply =
             buildWorkflowResponse(
+
                 workflow,
+
                 language,
+
                 lead
+
             );
+
 
         return {
 
-            success: true,
+            success:
+                true,
 
             language,
 
@@ -434,20 +658,25 @@ export const processConversation = async ({
             workflow,
 
             reply:
-                intro + workflowReply,
+                intro +
+                workflowReply,
 
-            actions: [],
+            actions:
+                []
 
         };
 
     }
+
 
     /* ==========================================
        Si falta información
        Aún NO usamos GPT
     ========================================== */
 
-    if (!workflow.completed) {
+    if (
+        !workflow.completed
+    ) {
 
         const engineResult =
             await runWorkflowEngine({
@@ -466,9 +695,11 @@ export const processConversation = async ({
 
             });
 
+
         return {
 
-            success: true,
+            success:
+                true,
 
             language:
                 engineResult.language,
@@ -489,8 +720,9 @@ export const processConversation = async ({
 
     }
 
+
     /* ==========================================
-    Workflow completado
+       Workflow completado
     ========================================== */
 
     const actions = [
@@ -507,8 +739,9 @@ export const processConversation = async ({
 
     ];
 
+
     /* ==========================================
-    Execute Actions
+       Execute Actions
     ========================================== */
 
     const actionResults =
@@ -522,24 +755,26 @@ export const processConversation = async ({
 
         });
 
+
     /* ==========================================
-    Finalizar conversación
+       Finalizar conversación
     ========================================== */
 
     finishConversation(
-
         conversationId
-
     );
+
 
     console.log(
         "⚙️ Action Results:",
         actionResults
     );
 
+
     return {
 
-        success: true,
+        success:
+            true,
 
         language,
 
@@ -548,15 +783,17 @@ export const processConversation = async ({
         workflow,
 
         reply:
+
             "🎉 ¡Perfecto! Ya tenemos toda la información necesaria.\n\n" +
+
             "Muchas gracias por confiar en Eventos York & Katy.\n\n" +
+
             "Nuestro equipo revisará tu solicitud y muy pronto se pondrá en contacto contigo para preparar una propuesta personalizada.\n\n" +
+
             "¡Que tengas un excelente día! 😊",
 
-        actions,
+        actions
 
     };
-
-
 
 };
