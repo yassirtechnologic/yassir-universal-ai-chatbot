@@ -8,16 +8,15 @@
    Yassir Technologic conversation engine.
 
    Responsibility:
-   Processes conversations for the Yassir Technologic
-   assistant using its own prompt, knowledge and AI
-   configuration without depending on the Eventos
-   York & Katy workflow.
+   Processes Yassir Technologic conversations,
+   extracts and maintains commercial lead information,
+   manages conversation state and generates AI responses.
 
    Author:
    Yassir Technologic
 
    Version:
-   1.0.0
+   2.0.0
 ========================================================== */
 
 
@@ -36,6 +35,20 @@ import {
 import {
     sendToOpenAI
 } from "../../services/openai.service.js";
+
+import {
+    extractTechLeadWithAI
+} from "./leadExtractor.js";
+
+import {
+    mergeTechLead
+} from "./leadMerger.js";
+
+import {
+    getTechSession,
+    updateTechSessionLanguage,
+    updateTechSessionLead
+} from "./session.js";
 
 
 /* ==========================================================
@@ -136,8 +149,7 @@ function getLastUserMessage(
  * - Spanish
  * - English
  *
- * This detector is intentionally conservative.
- * Spanish remains the safe default.
+ * Spanish remains the safe fallback.
  */
 
 function detectLanguage(
@@ -166,6 +178,69 @@ function detectLanguage(
 
 
     return "es";
+
+}
+
+
+/* ==========================================================
+   BUILD COMMERCIAL CONTEXT
+========================================================== */
+
+/*
+ * This context tells the conversational model what
+ * commercial information has already been extracted.
+ *
+ * It is internal context.
+ * The assistant must not expose it as JSON to the visitor.
+ */
+
+function buildCommercialContext(
+    session
+) {
+
+    return `
+==========================================================
+INTERNAL COMMERCIAL CONVERSATION STATE
+==========================================================
+
+The following information has already been identified
+during the current conversation.
+
+Do not display this object to the visitor.
+
+Do not mention internal lead extraction.
+
+Do not ask again for information that is already known.
+
+Use this information only to make the conversation
+more coherent and commercially useful.
+
+Lead:
+
+${JSON.stringify(
+    session.lead,
+    null,
+    2
+)}
+
+Commercial qualification:
+
+${session.qualified
+    ? "The opportunity currently has enough basic information to be considered qualified."
+    : "The opportunity is not yet basically qualified."}
+
+IMPORTANT:
+
+A qualified opportunity does not mean that you should
+end the conversation immediately.
+
+Continue helping the visitor naturally.
+
+If useful information is still missing, ask only what
+is genuinely relevant.
+
+Do not turn the conversation into a form or interrogation.
+`;
 
 }
 
@@ -251,6 +326,78 @@ export async function processYassirTechnologicConversation({
         );
 
 
+    updateTechSessionLanguage(
+        conversationId,
+        language
+    );
+
+
+    /* ======================================================
+       CURRENT SESSION
+    ====================================================== */
+
+    const currentSession =
+        getTechSession(
+            conversationId
+        );
+
+
+    /* ======================================================
+       EXTRACT COMMERCIAL LEAD
+    ====================================================== */
+
+    const extractedLead =
+        await extractTechLeadWithAI(
+            cleanMessages
+        );
+
+
+    console.log(
+        "🟢 Yassir Technologic extracted lead:",
+        extractedLead
+    );
+
+
+    /* ======================================================
+       MERGE COMMERCIAL LEAD
+    ====================================================== */
+
+    const mergedLead =
+        mergeTechLead(
+
+            currentSession.lead,
+
+            extractedLead
+
+        );
+
+
+    /* ======================================================
+       SAVE COMMERCIAL LEAD
+    ====================================================== */
+
+    const updatedSession =
+        updateTechSessionLead(
+
+            conversationId,
+
+            mergedLead
+
+        );
+
+
+    console.log(
+        "🔵 Yassir Technologic lead:",
+        updatedSession.lead
+    );
+
+
+    console.log(
+        "🎯 Yassir Technologic qualified:",
+        updatedSession.qualified
+    );
+
+
     /* ======================================================
        SYSTEM PROMPT
     ====================================================== */
@@ -264,6 +411,16 @@ export async function processYassirTechnologicConversation({
             language
 
         });
+
+
+    /* ======================================================
+       COMMERCIAL CONTEXT
+    ====================================================== */
+
+    const commercialContext =
+        buildCommercialContext(
+            updatedSession
+        );
 
 
     /* ======================================================
@@ -282,6 +439,16 @@ export async function processYassirTechnologicConversation({
 
         },
 
+        {
+
+            role:
+                "system",
+
+            content:
+                commercialContext
+
+        },
+
         ...cleanMessages
 
     ];
@@ -296,7 +463,7 @@ export async function processYassirTechnologicConversation({
 
 
     /* ======================================================
-       OPENAI REQUEST
+       GENERATE RESPONSE
     ====================================================== */
 
     const reply =
@@ -332,8 +499,11 @@ export async function processYassirTechnologicConversation({
 
             language,
 
-            messages:
-                cleanMessages.length
+            messageCount:
+                cleanMessages.length,
+
+            qualified:
+                updatedSession.qualified
 
         }
     );
@@ -355,13 +525,11 @@ export async function processYassirTechnologicConversation({
 
         reply,
 
-        /*
-         * Dedicated technology lead extraction
-         * will be implemented in a later phase.
-         */
-
         lead:
-            null,
+            updatedSession.lead,
+
+        qualified:
+            updatedSession.qualified,
 
         workflow:
             null,

@@ -270,10 +270,44 @@ export const handleAIChat = async (req, res) => {
       });
 
     console.log("========== CONVERSATION ENGINE ==========");
-    console.log("🌍 Idioma:", conversationResult.language);
-    console.log("👤 Lead:", conversationResult.lead);
-    console.log("📋 Workflow:", conversationResult.workflow);
-    console.log("💬 Reply:", conversationResult.reply);
+
+    console.log(
+        "🤖 Assistant:",
+        conversationResult.assistantId ||
+        assistantId ||
+        "eventos-york-katy"
+    );
+
+    console.log(
+        "🌍 Idioma:",
+        conversationResult.language
+    );
+
+    console.log(
+        "👤 Lead:",
+        conversationResult.lead
+    );
+
+    console.log(
+        "🎯 Qualified:",
+        conversationResult.qualified
+    );
+
+    console.log(
+        "💾 Persistence:",
+        conversationResult.persistence
+    );
+
+    console.log(
+        "📋 Workflow:",
+        conversationResult.workflow
+    );
+
+    console.log(
+        "💬 Reply:",
+        conversationResult.reply
+    );
+
     console.log("=========================================");
 
     /* ======================================================
@@ -292,21 +326,29 @@ export const handleAIChat = async (req, res) => {
           reply:
               conversationResult.reply,
 
-          workflow:
-              conversationResult.workflow,
+          language:
+              conversationResult.language,
 
           lead:
               conversationResult.lead,
 
-          language:
-              conversationResult.language,
+          qualified:
+              conversationResult.qualified ??
+              null,
+
+          persistence:
+              conversationResult.persistence ??
+              null,
+
+          workflow:
+              conversationResult.workflow,
 
           actions:
               conversationResult.actions
 
       });
 
-    }
+  }
     
     /* ======================================================
       Próximamente:
