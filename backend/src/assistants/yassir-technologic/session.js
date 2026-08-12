@@ -9,14 +9,14 @@
 
    Responsibility:
    Stores and manages isolated commercial conversation
-   state, lead qualification, persistence status and
-   notification status for Yassir Technologic.
+   state, lead qualification, contact intent,
+   persistence status and notification status.
 
    Author:
    Yassir Technologic
 
    Version:
-   2.0.0
+   2.1.0
 ========================================================== */
 
 
@@ -110,6 +110,32 @@ function createPersistenceState() {
 
 
 /* ==========================================================
+   CREATE CONTACT STATE
+========================================================== */
+
+/*
+ * Contact intent is kept separate from lead qualification.
+ *
+ * A visitor may provide contact information without
+ * explicitly requesting commercial follow-up.
+ */
+
+function createContactState() {
+
+    return {
+
+        requested:
+            false,
+
+        requestedAt:
+            null
+
+    };
+
+}
+
+
+/* ==========================================================
    CREATE NOTIFICATION STATE
 ========================================================== */
 
@@ -117,10 +143,25 @@ function createNotificationState() {
 
     return {
 
+        /* ==================================================
+           BUSINESS EMAIL
+        ================================================== */
+
         businessEmailSent:
             false,
 
         businessEmailSentAt:
+            null,
+
+
+        /* ==================================================
+           CUSTOMER EMAIL
+        ================================================== */
+
+        customerEmailSent:
+            false,
+
+        customerEmailSentAt:
             null
 
     };
@@ -155,6 +196,9 @@ function createSession(
 
         qualifiedAt:
             null,
+
+        contact:
+            createContactState(),
 
         persistence:
             createPersistenceState(),
@@ -294,7 +338,20 @@ export function updateTechSession(
 
 
     /* ======================================================
-       PROTECT NESTED STATE
+       PROTECT CONTACT STATE
+    ====================================================== */
+
+    updatedSession.contact = {
+
+        ...session.contact,
+
+        ...(updates.contact || {})
+
+    };
+
+
+    /* ======================================================
+       PROTECT PERSISTENCE STATE
     ====================================================== */
 
     updatedSession.persistence = {
@@ -305,6 +362,10 @@ export function updateTechSession(
 
     };
 
+
+    /* ======================================================
+       PROTECT NOTIFICATION STATE
+    ====================================================== */
 
     updatedSession.notifications = {
 
@@ -370,6 +431,105 @@ export function updateTechSessionLead(
             lead
 
         }
+    );
+
+}
+
+
+/* ==========================================================
+   MARK CONTACT REQUESTED
+========================================================== */
+
+export function markTechContactRequested(
+    conversationId
+) {
+
+    const session =
+        getTechSession(
+            conversationId
+        );
+
+
+    return updateTechSession(
+        conversationId,
+        {
+
+            contact: {
+
+                ...session.contact,
+
+                requested:
+                    true,
+
+                requestedAt:
+                    session.contact
+                        ?.requestedAt ||
+                    new Date().toISOString()
+
+            }
+
+        }
+    );
+
+}
+
+/* ==========================================================
+   MARK CONTACT REJECTED
+========================================================== */
+
+/*
+ * Allows the visitor to withdraw a previous
+ * request for commercial contact.
+ */
+
+export function markTechContactRejected(
+    conversationId
+) {
+
+    const session =
+        getTechSession(
+            conversationId
+        );
+
+
+    return updateTechSession(
+        conversationId,
+        {
+
+            contact: {
+
+                ...session.contact,
+
+                requested:
+                    false,
+
+                requestedAt:
+                    null
+
+            }
+
+        }
+    );
+
+}
+
+/* ==========================================================
+   HAS CONTACT BEEN REQUESTED
+========================================================== */
+
+export function hasTechContactBeenRequested(
+    conversationId
+) {
+
+    const session =
+        getTechSession(
+            conversationId
+        );
+
+
+    return (
+        session.contact
+            ?.requested === true
     );
 
 }
@@ -485,8 +645,55 @@ export function markTechBusinessEmailSent(
 
 
 /* ==========================================================
+   MARK CUSTOMER EMAIL SENT
+========================================================== */
+
+export function markTechCustomerEmailSent(
+    conversationId
+) {
+
+    const session =
+        getTechSession(
+            conversationId
+        );
+
+
+    return updateTechSession(
+        conversationId,
+        {
+
+            notifications: {
+
+                ...session.notifications,
+
+                customerEmailSent:
+                    true,
+
+                customerEmailSentAt:
+                    session.notifications
+                        ?.customerEmailSentAt ||
+                    new Date().toISOString()
+
+            }
+
+        }
+    );
+
+}
+
+
+/* ==========================================================
    SHOULD SEND BUSINESS EMAIL
 ========================================================== */
+
+/*
+ * Business notification is allowed only when:
+ *
+ * - opportunity is qualified
+ * - lead has been persisted
+ * - visitor explicitly requested contact
+ * - notification has not been sent before
+ */
 
 export function shouldSendTechBusinessEmail(
     conversationId
@@ -502,10 +709,55 @@ export function shouldSendTechBusinessEmail(
 
         session.qualified === true &&
 
-        session.persistence?.saved === true &&
+        session.persistence
+            ?.saved === true &&
+
+        session.contact
+            ?.requested === true &&
 
         session.notifications
             ?.businessEmailSent !== true
+
+    );
+
+}
+
+
+/* ==========================================================
+   SHOULD SEND CUSTOMER EMAIL
+========================================================== */
+
+/*
+ * Customer confirmation additionally requires
+ * a valid email to exist in the lead.
+ */
+
+export function shouldSendTechCustomerEmail(
+    conversationId
+) {
+
+    const session =
+        getTechSession(
+            conversationId
+        );
+
+
+    return (
+
+        session.qualified === true &&
+
+        session.persistence
+            ?.saved === true &&
+
+        session.contact
+            ?.requested === true &&
+
+        Boolean(
+            session.lead?.email
+        ) &&
+
+        session.notifications
+            ?.customerEmailSent !== true
 
     );
 

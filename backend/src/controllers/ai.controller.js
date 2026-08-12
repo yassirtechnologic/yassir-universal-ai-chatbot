@@ -336,6 +336,9 @@ export const handleAIChat = async (req, res) => {
               conversationResult.qualified ??
               null,
 
+          contact:
+              conversationResult.contact ?? null,
+
           persistence:
               conversationResult.persistence ??
               null,

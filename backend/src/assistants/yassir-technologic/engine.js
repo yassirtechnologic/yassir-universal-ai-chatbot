@@ -10,6 +10,7 @@
    Responsibility:
    Processes Yassir Technologic conversations,
    extracts and maintains commercial lead information,
+   detects explicit contact intent,
    persists qualified opportunities and generates
    AI responses.
 
@@ -17,7 +18,7 @@
    Yassir Technologic
 
    Version:
-   2.1.0
+   2.2.0
 ========================================================== */
 
 
@@ -46,9 +47,15 @@ import {
 } from "./leadMerger.js";
 
 import {
+    detectTechContactIntent
+} from "./contactIntent.js";
+
+import {
     getTechSession,
     updateTechSessionLanguage,
     updateTechSessionLead,
+    markTechContactRequested,
+    markTechContactRejected,
     markTechLeadPersisted
 } from "./session.js";
 
@@ -180,6 +187,71 @@ function detectLanguage(
 
 
 /* ==========================================================
+   APPLY CONTACT INTENT
+========================================================== */
+
+function applyContactIntent({
+
+    conversationId,
+
+    message
+
+}) {
+
+    const contactIntent =
+        detectTechContactIntent(
+            message
+        );
+
+
+    /* ======================================================
+       EXPLICIT CONTACT REQUEST
+    ====================================================== */
+
+    if (
+        contactIntent.requested === true
+    ) {
+
+        markTechContactRequested(
+            conversationId
+        );
+
+
+        console.log(
+            "📞 Yassir Technologic contact requested:",
+            conversationId
+        );
+
+    }
+
+
+    /* ======================================================
+       EXPLICIT CONTACT REJECTION
+    ====================================================== */
+
+    if (
+        contactIntent.rejected === true
+    ) {
+
+        markTechContactRejected(
+            conversationId
+        );
+
+
+        console.log(
+            "🚫 Yassir Technologic contact rejected:",
+            conversationId
+        );
+
+    }
+
+
+    return contactIntent;
+
+}
+
+
+/* ==========================================================
    BUILD COMMERCIAL CONTEXT
 ========================================================== */
 
@@ -220,6 +292,14 @@ ${
         : "The opportunity is not yet basically qualified."
 }
 
+Contact request:
+
+${
+    session.contact?.requested === true
+        ? "The visitor has explicitly requested commercial contact from the Yassir Technologic team."
+        : "The visitor has not explicitly requested commercial contact."
+}
+
 IMPORTANT:
 
 A qualified opportunity does not mean that you should
@@ -231,6 +311,14 @@ If useful information is still missing, ask only what
 is genuinely relevant.
 
 Do not turn the conversation into a form or interrogation.
+
+If the visitor has already requested contact, do not ask
+again whether they want to be contacted.
+
+You may acknowledge that their contact request has been
+registered, but do not claim that an email, call, meeting
+or other external action has already been performed unless
+the system explicitly confirms it.
 `;
 
 }
@@ -453,6 +541,21 @@ export async function processYassirTechnologicConversation({
 
 
     /* ======================================================
+       CONTACT INTENT
+    ====================================================== */
+
+    const contactIntent =
+        applyContactIntent({
+
+            conversationId,
+
+            message:
+                lastUserMessage
+
+        });
+
+
+    /* ======================================================
        CURRENT SESSION
     ====================================================== */
 
@@ -515,6 +618,12 @@ export async function processYassirTechnologicConversation({
     console.log(
         "🎯 Yassir Technologic qualified:",
         updatedSession.qualified
+    );
+
+
+    console.log(
+        "📞 Yassir Technologic contact state:",
+        updatedSession.contact
     );
 
 
@@ -653,6 +762,13 @@ export async function processYassirTechnologicConversation({
             qualified:
                 updatedSession.qualified,
 
+            contactRequested:
+                updatedSession.contact
+                    ?.requested === true,
+
+            contactDetectedThisMessage:
+                contactIntent,
+
             persisted:
                 updatedSession.persistence
                     ?.saved === true,
@@ -686,6 +802,17 @@ export async function processYassirTechnologicConversation({
 
         qualified:
             updatedSession.qualified,
+
+        contact: {
+
+            requested:
+                updatedSession.contact
+                    ?.requested === true,
+
+            detectedThisMessage:
+                contactIntent
+
+        },
 
         persistence: {
 
