@@ -71,6 +71,69 @@ function hasValue(
 
 }
 
+/* ==========================================================
+   NORMALIZE EMAIL
+========================================================== */
+
+/*
+ * Defensive email normalization.
+ *
+ * The lead extractor already normalizes emails, but the
+ * merger acts as a second security and data-quality layer.
+ *
+ * This prevents presentation markup such as:
+ *
+ * [user@example.com](mailto:user@example.com)
+ *
+ * from reaching:
+ *
+ * - session state
+ * - persistence
+ * - CRM
+ * - email notification services
+ */
+
+function normalizeEmail(
+    value
+) {
+
+    if (
+        typeof value !== "string"
+    ) {
+
+        return null;
+
+    }
+
+
+    const normalized =
+        value.trim();
+
+
+    if (!normalized) {
+
+        return null;
+
+    }
+
+
+    const match =
+        normalized.match(
+            /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i
+        );
+
+
+    if (!match) {
+
+        return null;
+
+    }
+
+
+    return match[0]
+        .toLowerCase();
+
+}
 
 /* ==========================================================
    NORMALIZE SERVICE ARRAY
@@ -217,8 +280,15 @@ export function mergeTechLead(
 
         email:
             mergeField(
-                previousLead.email,
-                extractedLead.email
+
+                normalizeEmail(
+                    previousLead.email
+                ),
+
+                normalizeEmail(
+                    extractedLead.email
+                )
+
             ),
 
         telefono:
