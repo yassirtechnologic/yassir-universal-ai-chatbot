@@ -9,14 +9,15 @@
 
    Responsibility:
    Extracts structured commercial opportunity data
-   from a Yassir Technologic conversation without
-   inventing information not provided by the visitor.
+   exclusively from information provided by the visitor,
+   without inventing or borrowing facts from assistant
+   responses.
 
    Author:
    Yassir Technologic
 
    Version:
-   1.0.0
+   1.1.0
 ========================================================== */
 
 
@@ -49,10 +50,20 @@ const MAX_HISTORY_MESSAGES =
 
 
 /* ==========================================================
-   NORMALIZE CONVERSATION
+   NORMALIZE USER MESSAGES
 ========================================================== */
 
-function normalizeMessages(
+/*
+ * IMPORTANT:
+ *
+ * Commercial facts must come from the visitor.
+ *
+ * Assistant messages are intentionally excluded from
+ * lead extraction so suggestions made by Yassir AI
+ * cannot accidentally become stored customer facts.
+ */
+
+function normalizeUserMessages(
     messages = []
 ) {
 
@@ -67,8 +78,7 @@ function normalizeMessages(
         .filter((message) => {
 
             return (
-                message?.role === "user" ||
-                message?.role === "assistant"
+                message?.role === "user"
             );
 
         })
@@ -77,7 +87,7 @@ function normalizeMessages(
             return {
 
                 role:
-                    message.role,
+                    "user",
 
                 content:
                     typeof message.content === "string"
@@ -163,36 +173,45 @@ function normalizeNullableString(
    EMAIL
 ========================================================== */
 
+/*
+ * Extracts an email even if the source contains
+ * presentation markup such as:
+ *
+ * [name@example.com](mailto:name@example.com)
+ */
+
 function normalizeEmail(
     value
 ) {
 
-    const email =
+    const source =
         normalizeNullableString(
             value
         );
 
 
-    if (!email) {
+    if (!source) {
 
         return null;
 
     }
 
 
-    const normalized =
-        email.toLowerCase();
+    const match =
+        source.match(
+            /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i
+        );
 
 
-    const emailPattern =
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!match) {
+
+        return null;
+
+    }
 
 
-    return emailPattern.test(
-        normalized
-    )
-        ? normalized
-        : null;
+    return match[0]
+        .toLowerCase();
 
 }
 
@@ -218,12 +237,6 @@ function normalizePhone(
     }
 
 
-    /*
-     * We intentionally keep international symbols,
-     * spaces and separators because phone formatting
-     * depends on the visitor's country.
-     */
-
     const allowedPattern =
         /^[+\d\s().-]{6,30}$/;
 
@@ -233,6 +246,67 @@ function normalizePhone(
     )
         ? phone
         : null;
+
+}
+
+
+/* ==========================================================
+   COMPANY
+========================================================== */
+
+/*
+ * A business category is not a company name.
+ *
+ * Example:
+ *
+ * "Tengo un restaurante"
+ *
+ * tipoNegocio = "Restaurante"
+ * empresa = null
+ */
+
+function normalizeCompany(
+    companyValue,
+    businessTypeValue
+) {
+
+    const company =
+        normalizeNullableString(
+            companyValue
+        );
+
+
+    if (!company) {
+
+        return null;
+
+    }
+
+
+    const businessType =
+        normalizeNullableString(
+            businessTypeValue
+        );
+
+
+    if (
+        businessType &&
+        company.localeCompare(
+            businessType,
+            undefined,
+            {
+                sensitivity:
+                    "accent"
+            }
+        ) === 0
+    ) {
+
+        return null;
+
+    }
+
+
+    return company;
 
 }
 
@@ -258,7 +332,9 @@ function normalizeServiceInterest(
             allowedServices.map(
                 (service) => [
 
-                    service.toLowerCase(),
+                    service
+                        .trim()
+                        .toLowerCase(),
 
                     service
 
@@ -338,6 +414,20 @@ function normalizeExtractedLead(
     }
 
 
+    /* ======================================================
+       BUSINESS TYPE FIRST
+    ====================================================== */
+
+    lead.tipoNegocio =
+        normalizeNullableString(
+            extractedLead.tipoNegocio
+        );
+
+
+    /* ======================================================
+       CONTACT
+    ====================================================== */
+
     lead.nombre =
         normalizeNullableString(
             extractedLead.nombre
@@ -345,8 +435,12 @@ function normalizeExtractedLead(
 
 
     lead.empresa =
-        normalizeNullableString(
-            extractedLead.empresa
+        normalizeCompany(
+
+            extractedLead.empresa,
+
+            lead.tipoNegocio
+
         );
 
 
@@ -362,11 +456,9 @@ function normalizeExtractedLead(
         );
 
 
-    lead.tipoNegocio =
-        normalizeNullableString(
-            extractedLead.tipoNegocio
-        );
-
+    /* ======================================================
+       OPPORTUNITY
+    ====================================================== */
 
     lead.problema =
         normalizeNullableString(
@@ -376,8 +468,11 @@ function normalizeExtractedLead(
 
     lead.servicioInteres =
         normalizeServiceInterest(
+
             extractedLead.servicioInteres,
+
             allowedServices
+
         );
 
 
@@ -470,9 +565,11 @@ function buildExtractionPrompt(
 You are a structured commercial lead extraction engine
 for Yassir Technologic.
 
-Your only responsibility is to extract information that
-the visitor has explicitly provided or that can be
-directly inferred without speculation from the conversation.
+Your only responsibility is to extract commercial facts
+from messages written by the VISITOR.
+
+The conversation supplied to you contains ONLY visitor
+messages.
 
 Return ONLY valid JSON.
 
@@ -480,12 +577,12 @@ Do not use Markdown.
 
 Do not include explanations.
 
-Do not invent missing data.
+Do not invent missing information.
 
 If a field is unknown, use null.
 
-For servicioInteres, use an empty array when no service
-can be identified with reasonable confidence.
+For servicioInteres, use an empty array when no official
+service can be identified with reasonable confidence.
 
 ==========================================================
 OUTPUT SCHEMA
@@ -506,47 +603,231 @@ OUTPUT SCHEMA
 }
 
 ==========================================================
-FIELD RULES
+SOURCE OF TRUTH
 ==========================================================
 
-nombre:
-The visitor's name only if explicitly provided.
+Only visitor messages are authoritative.
 
-empresa:
-Company or business name only if explicitly provided.
+Never invent facts.
 
-email:
-Visitor's email address only if explicitly provided.
+Never fill a field merely because it would be useful.
 
-telefono:
-Visitor's phone number only if explicitly provided.
+Never transform a suggestion, recommendation or likely
+scenario into a customer fact.
 
-tipoNegocio:
-The type of business or professional activity when the
-conversation clearly establishes it.
+==========================================================
+NOMBRE
+==========================================================
 
-problema:
-A concise summary of the concrete business problem,
-inefficiency or need described by the visitor.
+Use nombre only when the visitor explicitly provides
+their personal name.
 
-servicioInteres:
+Examples:
+
+"Me llamo Carlos"
+→ nombre = "Carlos"
+
+"Soy Carlos"
+→ nombre = "Carlos"
+
+Do not infer a name from an email address.
+
+==========================================================
+EMPRESA
+==========================================================
+
+empresa means the actual commercial name, organization
+name, brand name or company name.
+
+Only populate empresa when the visitor clearly provides
+a business or organization name.
+
+Examples:
+
+"Mi empresa se llama Restaurante La Plaza"
+→ empresa = "Restaurante La Plaza"
+
+"Trabajo en Acme Solutions"
+→ empresa = "Acme Solutions"
+
+"Somos Hotel Mirador"
+→ empresa = "Hotel Mirador"
+
+IMPORTANT:
+
+A business category is NOT a company name.
+
+Examples:
+
+"Tengo un restaurante"
+→ empresa = null
+→ tipoNegocio = "Restaurante"
+
+"Tengo un hotel"
+→ empresa = null
+→ tipoNegocio = "Hotel"
+
+"Soy autónomo"
+→ empresa = null
+→ tipoNegocio = "Autónomo"
+
+Never put values such as:
+
+"restaurante"
+"hotel"
+"empresa"
+"negocio"
+"autónomo"
+
+inside empresa unless the visitor clearly states that
+the value is actually the commercial name.
+
+==========================================================
+EMAIL
+==========================================================
+
+Extract only an email address explicitly provided by
+the visitor.
+
+If the input contains presentation markup around the
+email, return only the email address itself.
+
+Example:
+
+[carlos@example.com](mailto:carlos@example.com)
+
+must become:
+
+carlos@example.com
+
+==========================================================
+TELEFONO
+==========================================================
+
+Use only a telephone number explicitly provided by
+the visitor.
+
+Do not invent country codes.
+
+Do not modify a number except for harmless whitespace
+normalization.
+
+==========================================================
+TIPO NEGOCIO
+==========================================================
+
+Use tipoNegocio when the visitor clearly identifies
+their business category or professional activity.
+
+Examples:
+
+"Tengo un restaurante"
+→ tipoNegocio = "Restaurante"
+
+"Gestiono un hotel"
+→ tipoNegocio = "Hotel"
+
+"Soy fotógrafo autónomo"
+→ tipoNegocio = "Fotografía / profesional autónomo"
+
+==========================================================
+PROBLEMA
+==========================================================
+
+problema may be a concise summary of a concrete problem,
+inefficiency, repetitive process or business need
+explicitly described by the visitor.
+
+You may summarize the visitor's wording.
+
+Do not add problems the visitor did not describe.
+
+==========================================================
+SERVICIO INTERES
+==========================================================
+
 Only use official Yassir Technologic service names from
 the allowed list below.
 
-objetivo:
-The result the visitor wants to achieve.
+A service may be selected when:
 
-presupuesto:
-Only include budget information if the visitor explicitly
-mentions an amount, range or budget condition.
+1. The visitor explicitly mentions it.
 
-plazo:
-Only include timing information if the visitor explicitly
-mentions when they need or expect the solution.
+OR
 
-comentarios:
-Relevant commercial context that does not belong naturally
-in another field. Do not duplicate information unnecessarily.
+2. The visitor describes a need that clearly maps to
+   that service without speculative assumptions.
+
+Do not classify every problem as Artificial Intelligence.
+
+==========================================================
+OBJETIVO
+==========================================================
+
+objetivo represents an outcome the VISITOR explicitly
+states they want to achieve.
+
+Examples:
+
+"Quiero reducir el tiempo que dedica mi equipo a responder consultas"
+→ objetivo may contain that outcome.
+
+"Quiero aumentar las reservas"
+→ objetivo may contain that outcome.
+
+IMPORTANT:
+
+Do not create objetivo merely because a likely benefit
+exists.
+
+Do not use generic benefits such as:
+
+"improve efficiency"
+"increase customer satisfaction"
+"save money"
+"grow the business"
+
+unless the visitor actually expressed that objective.
+
+If the visitor did not state an objective, use null.
+
+==========================================================
+PRESUPUESTO
+==========================================================
+
+Only include presupuesto if the visitor explicitly
+mentions:
+
+- an amount,
+- a range,
+- a spending limit,
+- or a budget condition.
+
+Never invent a budget.
+
+==========================================================
+PLAZO
+==========================================================
+
+Only include plazo if the visitor explicitly mentions:
+
+- a date,
+- a period,
+- a deadline,
+- or when they expect the solution.
+
+Never invent a timeline.
+
+==========================================================
+COMENTARIOS
+==========================================================
+
+Use comentarios only for relevant commercial context
+explicitly communicated by the visitor that does not fit
+naturally in another field.
+
+Do not duplicate information already stored in another
+field unless necessary for meaning.
 
 ==========================================================
 OFFICIAL SERVICES
@@ -559,24 +840,19 @@ ${JSON.stringify(
 )}
 
 ==========================================================
-IMPORTANT RULES
+FINAL VALIDATION
 ==========================================================
 
-Do not assume that a visitor wants Artificial Intelligence
-simply because their problem could be solved with AI.
+Before returning JSON, verify:
 
-Do not invent company names.
-
-Do not invent budgets.
-
-Do not invent deadlines.
-
-Do not invent contact information.
-
-Do not classify assistant messages as visitor information.
-
-Use the entire conversation for context, but extract
-commercial facts from what the visitor has communicated.
+- empresa is not merely the same value as tipoNegocio.
+- nombre was explicitly provided.
+- email was explicitly provided.
+- telefono was explicitly provided.
+- objetivo came from a visitor statement.
+- presupuesto was explicitly provided.
+- plazo was explicitly provided.
+- no field came from an assistant suggestion.
 `;
 
 }
@@ -590,20 +866,28 @@ export async function extractTechLeadWithAI(
     messages = []
 ) {
 
-    const conversation =
-        normalizeMessages(
+    /* ======================================================
+       VISITOR MESSAGES ONLY
+    ====================================================== */
+
+    const visitorMessages =
+        normalizeUserMessages(
             messages
         );
 
 
     if (
-        conversation.length === 0
+        visitorMessages.length === 0
     ) {
 
         return createEmptyTechLead();
 
     }
 
+
+    /* ======================================================
+       ASSISTANT CONFIGURATION
+    ====================================================== */
 
     const assistant =
         getAssistant(
@@ -632,6 +916,10 @@ export async function extractTechLeadWithAI(
         );
 
 
+    /* ======================================================
+       AI EXTRACTION
+    ====================================================== */
+
     try {
 
         const response =
@@ -656,7 +944,7 @@ export async function extractTechLeadWithAI(
 
                         content:
                             JSON.stringify(
-                                conversation,
+                                visitorMessages,
                                 null,
                                 2
                             )
@@ -687,15 +975,18 @@ export async function extractTechLeadWithAI(
 
 
         return normalizeExtractedLead(
+
             parsed,
+
             allowedServices
+
         );
 
     } catch (error) {
 
         /*
          * Lead extraction must never prevent the chatbot
-         * from continuing a conversation.
+         * from continuing the conversation.
          */
 
         console.error(
