@@ -16,7 +16,7 @@
    Yassir Technologic
 
    Version:
-   1.0.0
+   1.1.0
 ========================================================== */
 
 
@@ -122,7 +122,8 @@ export function createEmptyTechLead() {
 
         ...EMPTY_TECH_LEAD,
 
-        servicioInteres: []
+        servicioInteres:
+            []
 
     };
 
@@ -149,27 +150,97 @@ export function hasTechLeadContact(
 
 
 /* ==========================================================
-   BASIC QUALIFICATION CHECK
+   COMMERCIAL NEED CHECK
 ========================================================== */
 
 /*
- * A lead is considered basically qualified when:
+ * A commercial need exists when at least one
+ * meaningful opportunity signal has been identified.
  *
- * - we understand the business problem
- * - and the visitor has provided at least one
- *   reliable contact method
+ * The visitor does not need to describe a "problem"
+ * explicitly.
  *
- * We intentionally do NOT require every field.
- * The chatbot should not behave like a rigid form.
+ * Examples:
+ *
+ * "Pierdo mucho tiempo respondiendo consultas."
+ * -> problema
+ *
+ * "Quiero implementar un chatbot."
+ * -> objetivo / servicioInteres
+ *
+ * "Necesito integrar mi sistema de reservas."
+ * -> servicioInteres
  */
 
-export function isTechLeadQualified(
+export function hasTechCommercialNeed(
     lead = {}
 ) {
 
     const hasProblem =
         Boolean(
             lead.problema
+        );
+
+
+    const hasObjective =
+        Boolean(
+            lead.objetivo
+        );
+
+
+    const hasServiceInterest =
+        Array.isArray(
+            lead.servicioInteres
+        ) &&
+        lead.servicioInteres.length > 0;
+
+
+    return (
+
+        hasProblem ||
+
+        hasObjective ||
+
+        hasServiceInterest
+
+    );
+
+}
+
+
+/* ==========================================================
+   BASIC QUALIFICATION CHECK
+========================================================== */
+
+/*
+ * A lead is considered basically qualified when:
+ *
+ * - we have identified a real commercial need
+ *
+ * AND
+ *
+ * - the visitor has provided at least one
+ *   reliable contact method
+ *
+ * A commercial need may be expressed as:
+ *
+ * - a business problem
+ * - an objective
+ * - interest in an official Yassir Technologic service
+ *
+ * We intentionally do NOT require every field.
+ *
+ * The chatbot should behave like a natural commercial
+ * assistant, not like a rigid form.
+ */
+
+export function isTechLeadQualified(
+    lead = {}
+) {
+
+    const hasCommercialNeed =
+        hasTechCommercialNeed(
+            lead
         );
 
 
@@ -180,8 +251,11 @@ export function isTechLeadQualified(
 
 
     return (
-        hasProblem &&
+
+        hasCommercialNeed &&
+
         hasContact
+
     );
 
 }

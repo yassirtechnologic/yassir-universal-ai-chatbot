@@ -151,29 +151,250 @@ function getLastUserMessage(
 
 }
 
-
 /* ==========================================================
    DETECT LANGUAGE
 ========================================================== */
+
+/*
+ * Lightweight language detection for the currently
+ * supported Yassir Technologic languages:
+ *
+ * - Spanish
+ * - English
+ *
+ * Shared technology words such as:
+ *
+ * - chatbot
+ * - software
+ * - API
+ * - AI
+ *
+ * are intentionally NOT treated as English indicators.
+ *
+ * Spanish remains the safe fallback.
+ */
 
 function detectLanguage(
     text = ""
 ) {
 
+    /* ======================================================
+       NORMALIZE
+    ====================================================== */
+
     const normalized =
         String(text)
+            .normalize("NFD")
+            .replace(
+                /[\u0300-\u036f]/g,
+                ""
+            )
             .toLowerCase()
             .trim();
 
 
-    const englishPattern =
-        /\b(hello|hi|hey|please|business|company|project|software|website|automation|automate|chatbot|price|cost|service|services|help|need|want)\b/i;
+    if (!normalized) {
 
+        return "es";
+
+    }
+
+
+    /* ======================================================
+       SPANISH SIGNALS
+    ====================================================== */
+
+    const spanishPatterns = [
+
+        /\bhola\b/,
+
+        /\btengo\b/,
+
+        /\bquiero\b/,
+
+        /\bquisiera\b/,
+
+        /\bnecesito\b/,
+
+        /\bnecesitamos\b/,
+
+        /\bbusco\b/,
+
+        /\bme gustaria\b/,
+
+        /\bpueden\b/,
+
+        /\bpuede\b/,
+
+        /\bcomo\b/,
+
+        /\bpara\b/,
+
+        /\bcon\b/,
+
+        /\buna\b/,
+
+        /\bun\b/,
+
+        /\bmi empresa\b/,
+
+        /\bmi negocio\b/,
+
+        /\brestaurante\b/,
+
+        /\bempresa\b/,
+
+        /\bnegocio\b/,
+
+        /\bproyecto\b/,
+
+        /\bcliente\b/,
+
+        /\bclientes\b/,
+
+        /\breservas\b/,
+
+        /\bautomatizar\b/,
+
+        /\bintegrar\b/,
+
+        /\bimplementar\b/,
+
+        /\bpresupuesto\b/,
+
+        /\bcorreo\b/,
+
+        /\btelefono\b/,
+
+        /\bcontacten\b/,
+
+        /\bllamen\b/,
+
+        /\bayuda\b/,
+
+        /\bayudar\b/
+
+    ];
+
+
+    /* ======================================================
+       ENGLISH SIGNALS
+    ====================================================== */
+
+    const englishPatterns = [
+
+        /\bhello\b/,
+
+        /\bhi\b/,
+
+        /\bhey\b/,
+
+        /\bplease\b/,
+
+        /\bi want\b/,
+
+        /\bi need\b/,
+
+        /\bi would like\b/,
+
+        /\bwe want\b/,
+
+        /\bwe need\b/,
+
+        /\bcan you\b/,
+
+        /\bcould you\b/,
+
+        /\bwould you\b/,
+
+        /\bmy business\b/,
+
+        /\bmy company\b/,
+
+        /\bour business\b/,
+
+        /\bour company\b/,
+
+        /\bbusiness\b/,
+
+        /\bcompany\b/,
+
+        /\bproject\b/,
+
+        /\bcustomer\b/,
+
+        /\bcustomers\b/,
+
+        /\breservation\b/,
+
+        /\breservations\b/,
+
+        /\bautomate\b/,
+
+        /\bintegrate\b/,
+
+        /\bimplement\b/,
+
+        /\bbudget\b/,
+
+        /\bphone\b/,
+
+        /\bcall me\b/,
+
+        /\bcontact me\b/,
+
+        /\bhelp me\b/
+
+    ];
+
+
+    /* ======================================================
+       SCORE LANGUAGE SIGNALS
+    ====================================================== */
+
+    const spanishScore =
+        spanishPatterns.reduce(
+            (score, pattern) => {
+
+                return (
+                    score +
+                    (
+                        pattern.test(normalized)
+                            ? 1
+                            : 0
+                    )
+                );
+
+            },
+            0
+        );
+
+
+    const englishScore =
+        englishPatterns.reduce(
+            (score, pattern) => {
+
+                return (
+                    score +
+                    (
+                        pattern.test(normalized)
+                            ? 1
+                            : 0
+                    )
+                );
+
+            },
+            0
+        );
+
+
+    /* ======================================================
+       RESOLVE LANGUAGE
+    ====================================================== */
 
     if (
-        englishPattern.test(
-            normalized
-        )
+        englishScore >
+        spanishScore
     ) {
 
         return "en";
@@ -181,10 +402,14 @@ function detectLanguage(
     }
 
 
+    /*
+     * Spanish is intentionally the fallback because it is
+     * Yassir Technologic's default language.
+     */
+
     return "es";
 
 }
-
 
 /* ==========================================================
    APPLY CONTACT INTENT
