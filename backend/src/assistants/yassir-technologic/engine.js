@@ -60,6 +60,14 @@ import {
 } from "./session.js";
 
 import {
+    sendTechBusinessLeadEmail
+} from "./businessEmail.service.js";
+
+import {
+    sendTechCustomerConfirmation
+} from "./customerEmail.service.js";
+
+import {
     upsertTechLead
 } from "./techLead.service.js";
 
@@ -677,6 +685,180 @@ async function persistQualifiedOpportunity({
 
 }
 
+/* ==========================================================
+   PROCESS COMMERCIAL NOTIFICATIONS
+========================================================== */
+
+/*
+ * Notifications are intentionally isolated from the
+ * conversational flow.
+ *
+ * A notification failure must never prevent the visitor
+ * from receiving a chatbot response.
+ */
+
+async function processCommercialNotifications({
+
+    conversationId,
+
+    assistant,
+
+    session,
+
+    language
+
+}) {
+
+    const result = {
+
+        businessEmail: {
+
+            attempted:
+                false,
+
+            sent:
+                false
+
+        },
+
+        customerEmail: {
+
+            attempted:
+                false,
+
+            sent:
+                false
+
+        }
+
+    };
+
+
+    /* ======================================================
+       BUSINESS EMAIL
+    ====================================================== */
+
+    const businessEmailEnabled =
+        assistant.config?.automations
+            ?.sendEmailToBusiness === true;
+
+
+    if (
+        businessEmailEnabled &&
+        shouldSendTechBusinessEmail(
+            conversationId
+        )
+    ) {
+
+        result.businessEmail.attempted =
+            true;
+
+
+        try {
+
+            const emailResult =
+                await sendTechBusinessLeadEmail({
+
+                    lead:
+                        session.lead,
+
+                    leadId:
+                        session.persistence?.leadId ||
+                        null,
+
+                    language
+
+                });
+
+
+            if (
+                emailResult?.success === true
+            ) {
+
+                markTechBusinessEmailSent(
+                    conversationId
+                );
+
+
+                result.businessEmail.sent =
+                    true;
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "❌ Yassir Technologic business email failed:",
+                error
+            );
+
+        }
+
+    }
+
+
+    /* ======================================================
+       CUSTOMER EMAIL
+    ====================================================== */
+
+    const customerEmailEnabled =
+        assistant.config?.automations
+            ?.sendEmailToCustomer === true;
+
+
+    if (
+        customerEmailEnabled &&
+        shouldSendTechCustomerEmail(
+            conversationId
+        )
+    ) {
+
+        result.customerEmail.attempted =
+            true;
+
+
+        try {
+
+            const emailResult =
+                await sendTechCustomerConfirmation({
+
+                    lead:
+                        session.lead,
+
+                    language
+
+                });
+
+
+            if (
+                emailResult?.success === true
+            ) {
+
+                markTechCustomerEmailSent(
+                    conversationId
+                );
+
+
+                result.customerEmail.sent =
+                    true;
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "❌ Yassir Technologic customer email failed:",
+                error
+            );
+
+        }
+
+    }
+
+
+    return result;
+
+}
 
 /* ==========================================================
    PROCESS YASSIR TECHNOLOGIC CONVERSATION
@@ -819,9 +1001,8 @@ export async function processYassirTechnologicConversation({
 
         );
 
-
     /* ======================================================
-       SAVE LEAD IN SESSION
+    SAVE LEAD IN SESSION
     ====================================================== */
 
     let updatedSession =
@@ -853,7 +1034,7 @@ export async function processYassirTechnologicConversation({
 
 
     /* ======================================================
-       PERSIST QUALIFIED OPPORTUNITY
+    PERSIST QUALIFIED OPPORTUNITY
     ====================================================== */
 
     const persistence =
@@ -870,9 +1051,38 @@ export async function processYassirTechnologicConversation({
 
 
     /*
-     * Persistence may update the session with
-     * saved, leadId, savedAt and updatedAt.
-     */
+    * Persistence may update the session with
+    * saved, leadId, savedAt and updatedAt.
+    */
+
+    updatedSession =
+        getTechSession(
+            conversationId
+        );
+
+
+    /* ======================================================
+    COMMERCIAL NOTIFICATIONS
+    ====================================================== */
+
+    const notifications =
+        await processCommercialNotifications({
+
+            conversationId,
+
+            assistant,
+
+            session:
+                updatedSession,
+
+            language
+
+        });
+
+
+    /*
+    * Email actions may update notification state.
+    */
 
     updatedSession =
         getTechSession(
@@ -1057,6 +1267,38 @@ export async function processYassirTechnologicConversation({
 
         },
 
+        notifications: {
+
+            businessEmail: {
+
+                attempted:
+                    notifications.businessEmail.attempted,
+
+                sent:
+                    notifications.businessEmail.sent,
+
+                alreadySent:
+                    updatedSession.notifications
+                        ?.businessEmailSent === true
+
+            },
+
+            customerEmail: {
+
+                attempted:
+                    notifications.customerEmail.attempted,
+
+                sent:
+                    notifications.customerEmail.sent,
+
+                alreadySent:
+                    updatedSession.notifications
+                        ?.customerEmailSent === true
+
+            }
+
+        },
+
         workflow:
             null,
 
@@ -1065,4 +1307,4 @@ export async function processYassirTechnologicConversation({
 
     };
 
-}
+    }

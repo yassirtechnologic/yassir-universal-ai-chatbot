@@ -150,7 +150,7 @@ const yassirTechnologicConfig = {
             true,
 
         sendEmailToCustomer:
-            false,
+            true,
 
         sendWhatsAppToBusiness:
             false,
