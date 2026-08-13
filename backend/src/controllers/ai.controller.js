@@ -343,6 +343,9 @@ export const handleAIChat = async (req, res) => {
               conversationResult.persistence ??
               null,
 
+          notifications:
+              conversationResult.notifications ?? null,
+
           workflow:
               conversationResult.workflow,
 

@@ -56,7 +56,11 @@ import {
     updateTechSessionLead,
     markTechContactRequested,
     markTechContactRejected,
-    markTechLeadPersisted
+    markTechLeadPersisted,
+    markTechBusinessEmailSent,
+    markTechCustomerEmailSent,
+    shouldSendTechBusinessEmail,
+    shouldSendTechCustomerEmail
 } from "./session.js";
 
 import {
