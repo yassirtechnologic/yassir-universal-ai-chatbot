@@ -5,17 +5,17 @@
    mailer.service.js
 
    Description:
-   Shared SMTP email transport service.
+   Yassir Technologic SMTP email transport service.
 
    Responsibility:
-   Provides a reusable and centralized mechanism
-   for sending transactional emails through SMTP.
+   Provides a centralized mechanism for sending
+   Yassir Technologic transactional emails through SMTP.
 
    Author:
    Yassir Technologic
 
    Version:
-   1.0.0
+   1.1.0
 ========================================================== */
 
 
@@ -33,19 +33,23 @@ import nodemailer from "nodemailer";
 function getSmtpConfig() {
 
     const host =
-        process.env.EMAIL_HOST;
+        process.env.YASSIR_TECH_EMAIL_HOST;
 
     const port =
         Number(
-            process.env.EMAIL_PORT
+            process.env.YASSIR_TECH_EMAIL_PORT
         ) || 587;
 
     const user =
-        process.env.EMAIL_USER;
+        process.env.YASSIR_TECH_EMAIL_USER;
 
     const pass =
-        process.env.EMAIL_PASS;
+        process.env.YASSIR_TECH_EMAIL_PASS;
 
+
+    /* ======================================================
+       VALIDATE CONFIGURATION
+    ====================================================== */
 
     if (
         !host ||
@@ -54,7 +58,7 @@ function getSmtpConfig() {
     ) {
 
         throw new Error(
-            "SMTP configuration is incomplete."
+            "Yassir Technologic SMTP configuration is incomplete."
         );
 
     }
@@ -156,6 +160,25 @@ export async function sendEmail({
 
 
     /* ======================================================
+       SMTP USER
+    ====================================================== */
+
+    const senderEmail =
+        process.env.YASSIR_TECH_EMAIL_USER;
+
+
+    if (
+        !senderEmail
+    ) {
+
+        throw new Error(
+            "Yassir Technologic sender email is not configured."
+        );
+
+    }
+
+
+    /* ======================================================
        TRANSPORTER
     ====================================================== */
 
@@ -169,7 +192,8 @@ export async function sendEmail({
 
     const mailOptions = {
 
-        from: `"${fromName || "Yassir Technologic"}" <${process.env.EMAIL_USER}>`,
+        from:
+            `"${fromName || "Yassir Technologic"}" <${senderEmail}>`,
 
         to:
             to.trim(),
@@ -215,7 +239,7 @@ export async function sendEmail({
 
 
     console.log(
-        "📧 Email sent:",
+        "📧 Yassir Technologic email sent:",
         {
             to:
                 to.trim(),
